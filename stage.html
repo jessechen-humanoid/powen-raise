@@ -444,6 +444,9 @@ function renderState(prev) {
   $("btn-start").disabled = gameState !== "idle";
   $("btn-freeze").disabled = gameState !== "running";
   if (gameState !== "running") stopCountdown();
+  // 看到 idle 就作廢上一回合的續跑時間——否則第二台備援投影頁若殘留過期
+  // endsAt，會在別台按 S 的瞬間誤判「回合已結束」而立刻凍結全場。
+  if (gameState === "idle") localStorage.removeItem(ENDS_KEY);
   if (gameState === "running" && !tickTimer) {
     // 頁面在 running 中重新整理：從 localStorage 續跑倒數
     const endsAt = parseInt(localStorage.getItem(ENDS_KEY), 10);
