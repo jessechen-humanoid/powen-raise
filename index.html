@@ -42,18 +42,13 @@
   /* ===== 入場畫面 ===== */
   #onboarding h1 { align-self: flex-start; text-align: left; }
   .field-label { align-self: flex-start; font-size: 15px; font-weight: 700; color: var(--ink); margin: 18px 0 8px; }
-  #table-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; }
-  .table-btn {
-    padding: 10px 0; border: 1px solid rgba(255,250,235,.22); border-radius: 10px;
-    background: #1a1a1a; color: var(--ink); font-size: 15px; font-family: inherit;
-  }
-  .table-btn.selected { background: var(--yellow); color: #1a1200; border-color: var(--yellow); font-weight: 700; }
-  #nickname {
+  /* 桌次下拉與暱稱輸入：與 QQQQAAAA submit.html 同款 */
+  #table-select, #nickname {
     width: 100%; padding: 14px 12px; font-size: 17px; border-radius: 10px;
     border: 1px solid rgba(255,250,235,.22); background: #1a1a1a; color: var(--ink);
     outline: none; font-family: inherit; -webkit-appearance: none; appearance: none;
   }
-  #nickname:focus { border-color: var(--yellow); }
+  #table-select:focus, #nickname:focus { border-color: var(--yellow); }
   #form-hint { color: #ff6b6b; font-size: 14px; font-weight: 700; min-height: 20px; margin-top: 8px; align-self: flex-start; }
   #join-btn {
     margin-top: 12px; width: 100%; min-height: 54px; padding: 16px 0;
@@ -100,7 +95,9 @@
   <div class="tag">支薪好友專場</div>
   <h1>瘋狂按下按鈕，<br>幫柏文加薪吧！</h1>
   <div class="field-label">你坐哪一桌？</div>
-  <div id="table-grid"></div>
+  <select id="table-select">
+    <option value="" disabled selected>請選擇</option>
+  </select>
   <div class="field-label">你的暱稱（最多 4 個字）</div>
   <input id="nickname" maxlength="4" placeholder="例：歐北貴人" autocomplete="off">
   <div id="form-hint"></div>
@@ -142,20 +139,18 @@ const STORE_KEY = "raise.player";
 let player = null; // { id, table, name }
 try { player = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (_) { /* 壞資料當作未入場 */ }
 
-// ---- 桌次選單 B3–B32 ----
-const TABLES = Array.from({ length: 30 }, (_, i) => "B" + (i + 3));
+// ---- 桌次下拉選單 B3–B32（與 QQQQAAAA submit.html 同形式）----
 let selectedTable = null;
-for (const t of TABLES) {
-  const btn = document.createElement("button");
-  btn.className = "table-btn";
-  btn.textContent = t;
-  btn.addEventListener("click", () => {
-    selectedTable = t;
-    document.querySelectorAll(".table-btn").forEach((b) => b.classList.toggle("selected", b === btn));
-    validateForm();
-  });
-  $("table-grid").appendChild(btn);
+for (let n = 3; n <= 32; n++) {
+  const opt = document.createElement("option");
+  opt.value = "B" + n;
+  opt.textContent = "B" + n;
+  $("table-select").appendChild(opt);
 }
+$("table-select").addEventListener("change", () => {
+  selectedTable = $("table-select").value || null;
+  validateForm();
+});
 
 function nicknameError(raw) {
   const name = raw.trim();

@@ -9,58 +9,62 @@
     --bg:#0a0a0a;
     --ink:#FFFDF6;
     --yellow:#FFD166;
+    --side:24vw;   /* 右側欄寬度，與 QQQQAAAA screen.html 相同 */
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; overflow: hidden; }
+  html, body { height: 100vh; overflow: hidden; }
   body {
     background: var(--bg);
     color: var(--ink);
     font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   }
   #error-banner {
-    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 99;
-    background: #1a0d0d; color: #ff7b78; text-align: center; padding: 1vh; font-size: 2.2vh; font-weight: 700;
+    display: none; position: fixed; top: 3vh; left: 2vw; right: calc(var(--side) + 2vw); z-index: 99;
+    align-items: center; color: var(--yellow); background: rgba(0,0,0,.7);
+    border: 2px solid var(--yellow); border-radius: 10px; padding: 1.4vh 2vw; font-size: 2.2vh; font-weight: 800;
   }
 
-  /* ===== 三欄版面 28 / 44 / 28（--yoff 由 ↑↓ 微調投影對位，存 localStorage） ===== */
-  #stage {
-    display: grid; grid-template-columns: 28fr 44fr 28fr;
-    gap: 2vw; width: 100vw; height: 100vh;
-    padding: 4vh 2.5vw 11vh;
-    transform: translateY(var(--yoff, 0vh));
-  }
-  .col { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  /* ===== 整體容器（--yoff 投影對位，與 screen.html 相同機制）===== */
+  #screenArea { position: relative; height: 100vh; overflow: hidden; background: var(--bg);
+    transform: translateY(var(--yoff, 0vh)); }
 
-  /* ----- 左欄：排行榜 ----- */
-  #board-title { font-size: 4.2vh; color: var(--yellow); font-weight: 900; margin-bottom: 2.5vh; letter-spacing: .3vh; }
+  /* ===== 主舞台區（側欄以左）===== */
+  #main { position: absolute; top: 0; left: 0; bottom: 0; right: var(--side); overflow: hidden;
+    display: grid; grid-template-columns: 34fr 66fr; gap: 1vw; padding: 4vh 1.5vw 0 2vw; }
+
+  /* 主區左：排行榜 */
+  #boardWrap { display: flex; flex-direction: column; align-items: center; min-width: 0; z-index: 2; }
+  #board-title { font-size: min(4vh, 1.8vw); color: var(--yellow); font-weight: 900; margin-bottom: 2vh; letter-spacing: .3vh;
+    text-shadow: 0 2px 8px #000; white-space: nowrap; }
   #board { width: 100%; list-style: none; }
   #board li {
-    display: grid; grid-template-columns: 3.8vh minmax(0, 1fr) auto;
+    display: grid; grid-template-columns: 3.6vh minmax(0, 1fr) auto;
     align-items: baseline; gap: .5vw;
-    font-size: 4.2vh; line-height: 1.55; font-weight: 700;
+    font-size: 4vh; line-height: 1.55; font-weight: 700;
     white-space: nowrap; overflow: hidden;
+    text-shadow: 0 2px 10px #000;
   }
   #board li .rank { color: rgba(255,253,246,.5); font-variant-numeric: tabular-nums; font-size: .68em; text-align: right; }
   #board li:nth-child(1) .rank, #board li:nth-child(1) .who { color: var(--yellow); }
   #board li .who { overflow: hidden; text-overflow: ellipsis; }
   #board li .amt { color: var(--yellow); font-variant-numeric: tabular-nums; font-weight: 700; font-size: .62em; }
 
-  /* ----- 中欄：倒數＋金額＋柏文 ----- */
-  #center { position: relative; justify-content: flex-start; }
+  /* 主區右：倒數＋金額 */
+  #center { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-width: 0; z-index: 2; }
   #countdown {
     visibility: hidden;
     font-size: 9vh; font-weight: 900; color: var(--yellow);
     font-variant-numeric: tabular-nums; line-height: 1.1;
-    margin-bottom: 1vh; z-index: 2;
+    margin-bottom: 1vh; text-shadow: 0 2px 10px #000;
   }
   #countdown.on { visibility: visible; }
   #countdown.urgent { color: #ff6b6b; animation: pulse .5s infinite alternate; }
   @keyframes pulse { to { transform: scale(1.12); } }
-  #amount-label { font-size: 4.5vh; color: rgba(255,253,246,.6); letter-spacing: .5vh; z-index: 2; }
+  #amount-label { font-size: 4.2vh; color: rgba(255,253,246,.6); letter-spacing: .5vh; }
   #amount {
-    font-size: min(9.5vw, 19vh); font-weight: 900; color: var(--ink);
-    line-height: 1.15; z-index: 2; white-space: nowrap;
-    text-shadow: 0 0 4vh rgba(255, 209, 102, .22);
+    font-size: min(8.5vw, 18vh); font-weight: 900; color: var(--ink);
+    line-height: 1.15; white-space: nowrap;
+    text-shadow: 0 2px 10px #000, 0 0 4vh rgba(255, 209, 102, .22);
   }
   #amount .odo { display: inline-block; height: 1.15em; overflow: hidden; vertical-align: bottom; }
   #amount .strip { display: flex; flex-direction: column; transition: transform .45s cubic-bezier(.2, .7, .3, 1); }
@@ -72,113 +76,172 @@
     70% { transform: scale(.97); }
     100% { transform: scale(1); }
   }
-  #frozen-tag { visibility: hidden; font-size: 4vh; color: #ff6b6b; font-weight: 800; margin-top: 2vh; letter-spacing: .5vh; z-index: 2; }
+  #frozen-tag { visibility: hidden; font-size: 4vh; color: #ff6b6b; font-weight: 800; margin-top: 1.5vh; letter-spacing: .5vh; }
   body.frozen #frozen-tag { visibility: visible; }
 
-  /* 柏文狂喜動態：金額最近 1 秒有增加才彈跳，安靜時回靜止，凍結定格慶祝姿勢。
-     powen.png 不存在時自動改用內嵌 SVG 小人（換上真照片即生效，零程式改動）。 */
-  #powen { margin-top: auto; margin-bottom: 1vh; z-index: 2; }
-  #powen img, #powen svg { height: 24vh; display: block; }
-  #powen img { border-radius: 50%; border: .6vh solid var(--yellow); background: #1a1a1a; object-fit: cover; aspect-ratio: 1; }
-  #powen.excited { animation: powen-bounce .5s ease-in-out infinite; }
-  @keyframes powen-bounce {
-    0%, 100% { transform: translateY(0) rotate(-2deg); }
-    50% { transform: translateY(-3vh) rotate(2deg); }
-  }
-  #powen.celebrate { transform: translateY(-2vh) scale(1.08); }
-
-  /* 千元鈔（一按一鈔）：低透明度背景層，不遮金額 */
-  #bills { position: absolute; inset: 0; overflow: hidden; z-index: 1; pointer-events: none; }
-  .bill { position: absolute; top: -12vh; opacity: .32; animation: fall linear forwards; }
+  /* 千元鈔（一按一鈔）：深淺黃色系、低透明度背景層，蓋整個主區 */
+  #bills { position: absolute; top: 0; left: 0; bottom: 0; right: var(--side); overflow: hidden; z-index: 1; pointer-events: none; }
+  .bill { position: absolute; top: -12vh; opacity: .35; animation: fall linear forwards; }
   @keyframes fall {
     from { transform: translateY(0) rotate(-12deg); }
     to { transform: translateY(120vh) rotate(14deg); }
   }
 
-  /* ----- 右欄：QR ----- */
-  #qr-box {
-    background: #fff; border-radius: 16px;
-    box-shadow: 0 0 24px rgba(0, 0, 0, .6);
-    width: min(22vw, 44vh); height: min(22vw, 44vh);
-    padding: 1.8vh; display: flex; align-items: center; justify-content: center;
-  }
-  #qr-box img { width: 100%; height: 100%; object-fit: contain; }
-  #qr-fallback { display: none; color: #333; font-size: 2.4vh; text-align: center; padding: 1vh; }
-  #qr-caption { margin-top: 2.5vh; font-size: 3.8vh; color: var(--yellow); font-weight: 900; text-align: center; line-height: 1.5; }
+  /* ===== 柏文小人（A 蛋形）：主區底部左右來回跑，純裝飾 ===== */
+  #powen-track { position: absolute; left: 0; right: var(--side); bottom: 1vh; height: 30vh; z-index: 3; pointer-events: none; }
+  #runner { position: absolute; bottom: 0; left: 0;
+    animation: run 7s ease-in-out infinite alternate; animation-play-state: paused; }
+  #runner .flip { animation: flip 14s step-end infinite; animation-play-state: paused; }
+  .powen { position: relative; width: 13vh; }
+  /* 頭壓進軀幹頂（深疊 46%），看起來才像長在身上而不是飄著 */
+  .powen .head { display: block; width: 56%; margin: 0 auto -46%; position: relative; z-index: 2; }
+  .powen .head-fallback { display: none; }
+  .powen .body { display: block; width: 100%; }
+  /* 身體膚色（取自照片膚調） */
+  .powen .limb { fill: none; stroke: #E8B88C; stroke-width: 19; stroke-linecap: round; }
+  #runner .powen { animation: bob .32s ease-in-out infinite alternate; animation-play-state: paused; }
+  #runner .legL { transform-origin: 84px 178px; animation: kickL .32s ease-in-out infinite alternate; animation-play-state: paused; }
+  #runner .legR { transform-origin: 116px 178px; animation: kickR .32s ease-in-out infinite alternate; animation-play-state: paused; }
+  body.running #runner, body.running #runner .flip, body.running #runner .powen,
+  body.running #runner .legL, body.running #runner .legR { animation-play-state: running; }
+  /* 凍結：停在原地、微微上抬定格慶祝 */
+  body.frozen #runner .powen { transform: translateY(-1.5vh); }
+  @keyframes run { from { transform: translateX(2vw); } to { transform: translateX(calc(76vw - 16vh)); } }
+  @keyframes flip { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
+  @keyframes bob { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-1.2vh) rotate(2deg); } }
+  @keyframes kickL { from { transform: rotate(-24deg); } to { transform: rotate(20deg); } }
+  @keyframes kickR { from { transform: rotate(20deg); } to { transform: rotate(-24deg); } }
 
-  /* ===== 浮動操作面板（後台人員用）：閒置 3 秒淡出，滑鼠移動喚回 ===== */
-  #controls {
-    position: fixed; left: 50%; bottom: 2vh; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 1vw;
-    background: #111; border: 1px solid #2a2a2a; border-radius: 14px;
-    padding: 1.4vh 1.4vw;
-    font-size: 2.2vh; z-index: 50;
-    transition: opacity .4s ease;
-  }
-  #controls.hidden { opacity: 0; pointer-events: none; }
-  #controls button {
-    padding: 1.2vh 1.4vw; font-size: 2.2vh; font-weight: 700; font-family: inherit;
-    border: 1px solid #333; border-radius: 8px;
-    background: #000; color: #ddd; cursor: pointer;
-  }
-  #controls button:disabled { opacity: .35; cursor: default; }
-  #btn-reset.confirming { background: #1a0d0d; border-color: #ff6b6b; color: #ff7b78; }
-  #controls label { color: #9aa; }
-  #sec-input {
-    width: 5.5vw; min-width: 64px; padding: 1vh .5vw; font-size: 2.2vh; text-align: center; font-family: inherit;
-    border: 1px solid #333; border-radius: 8px; background: #000; color: var(--ink);
-  }
-  #controls .key { color: #777; font-size: 1.8vh; }
+  /* ===== 右側欄（與 screen.html 相同結構）===== */
+  #sidebar { position: absolute; top: 0; right: 0; bottom: 0; width: var(--side); z-index: 10;
+    background: #080808; border-left: 2px solid #1c1c1c; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    gap: 3vh; padding: 4vh 1.5vw; }
+  #qrWrap { display: flex; flex-direction: column; align-items: center; width: 100%; }
+  #qrBox { position: relative; width: 74%; aspect-ratio: 1; border-radius: 16px; overflow: hidden; background: #fff;
+    box-shadow: 0 0 24px rgba(0,0,0,.6); }
+  #qrBox img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; }
+  #qrPlaceholder { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #151515; color: #777; border: 2px dashed #333; text-align: center; font-weight: 800; font-size: 2.6vh; gap: 1vh; }
+  #ctaWrap { display: flex; align-items: center; justify-content: center; }
+  #ctaTitle { color: var(--yellow); font-weight: 900; font-size: min(3.4vh, 2.2vw); line-height: 1.55; text-align: center;
+    text-shadow: 0 2px 8px #000; white-space: nowrap; }
+  #counterWrap { display: flex; flex-direction: column; align-items: center; width: 100%; }
+  .counterLine { font-size: 2.2vh; color: #e8e8e8; font-weight: 700; text-align: center; }
+  #guestCount { display: block; font-size: 7vh; color: var(--ink); font-weight: 900; margin: .4vh 0; text-shadow: 0 2px 10px #000; }
+
+  /* ===== 操作介面（與 screen.html 相同語彙）===== */
+  #fsBtn, #cogBtn { position: fixed; bottom: 12px; z-index: 50; background: #111; color: #777;
+    border: 1px solid #333; border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer; font-family: inherit; }
+  #fsBtn { right: 14px; } #cogBtn { right: 130px; }
+  #stat { position: fixed; left: 12px; bottom: 10px; color: #444; font-size: 12px; font-family: monospace; z-index: 50; }
+
+  #panel { position: fixed; right: 14px; bottom: 50px; width: 344px; max-height: 82vh; overflow: auto; z-index: 60;
+    background: #111; border: 1px solid #333; border-radius: 14px; padding: 16px 16px 18px; display: none; color: #ddd; }
+  #panel.open { display: block; }
+  #panel h3 { margin: 2px 0 10px; font-size: 15px; color: #fff; }
+  #panel .hint { font-size: 11px; color: #777; line-height: 1.5; margin: 0 0 12px; }
+  #panel label { display: block; font-size: 12px; color: #9aa; margin: 12px 0 4px; }
+  #panel input { width: 100%; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid #333; background: #000; color: #fff; font-family: inherit; }
+  #panel .acts { display: flex; gap: 8px; margin-top: 6px; }
+  #panel .acts button { flex: 1; font-size: 14px; font-weight: 800; padding: 10px 0; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; }
+  #btn-start { background: #fff; color: #000; }
+  #btn-start:disabled, #btn-freeze:disabled { opacity: .35; cursor: default; }
+  #btn-freeze { background: #000; color: #ccc; border: 1px solid #333 !important; }
+  #btn-reset { background: #000; color: #888; border: 1px solid #333 !important; }
+  #btn-reset.confirming { background: #1a0d0d; color: #ff7b78; border-color: #ff6b6b !important; }
+  #panel .keys { font-size: 11px; color: #666; margin-top: 14px; line-height: 1.6; }
 </style>
 </head>
 <body>
-<div id="error-banner">Firebase 初始化失敗，請檢查 firebase-config.js（見 docs/firebase-setup.md）</div>
+<div id="screenArea">
+  <!-- 千元鈔層（主區範圍） -->
+  <div id="bills"></div>
 
-<main id="stage">
-  <!-- 左欄：TOP10 貴人 -->
-  <section class="col">
-    <div id="board-title">柏文 TOP10 貴人</div>
-    <ol id="board"></ol>
-  </section>
+  <!-- 主舞台區：排行榜＋金額 -->
+  <main id="main">
+    <section id="boardWrap">
+      <div id="board-title">柏文 TOP10 貴人</div>
+      <ol id="board"></ol>
+    </section>
+    <section id="center">
+      <div id="countdown">90</div>
+      <div id="amount-label">柏文目前已加薪</div>
+      <div id="amount"></div>
+      <div id="frozen-tag">— 薪水已凍結 —</div>
+    </section>
+  </main>
 
-  <!-- 中欄：倒數＋累積金額＋柏文 -->
-  <section class="col" id="center">
-    <div id="bills"></div>
-    <div id="countdown">90</div>
-    <div id="amount-label">柏文目前已加薪</div>
-    <div id="amount"></div>
-    <div id="frozen-tag">— 薪水已凍結 —</div>
-    <div id="powen">
-      <img src="powen.png" alt="柏文" onerror="this.remove(); document.getElementById('powen-fallback').style.display='block'">
-      <svg id="powen-fallback" style="display:none" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
-        <!-- 佔位小人（QQQQAAAA token 色）：雙手高舉的狂喜姿勢 -->
-        <circle cx="50" cy="26" r="16" fill="#FFD166"/>
-        <path d="M42 22 q3 -4 6 0 M54 22 q3 -4 6 0" stroke="#1a1200" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <path d="M41 32 q9 8 18 0" stroke="#1a1200" stroke-width="3" fill="none" stroke-linecap="round"/>
-        <path d="M50 42 v34 M50 50 L24 24 M50 50 L76 24 M50 76 L34 108 M50 76 L66 108"
-              stroke="#FFFDF6" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+  <!-- 柏文小人跑道 -->
+  <div id="powen-track">
+    <div id="runner"><div class="flip">
+      <div class="powen">
+        <img class="head" src="powen-head.png" alt="柏文"
+             onerror="this.style.display='none'; this.closest('.powen').querySelector('.head-fallback').style.display='block'">
+        <svg class="head-fallback" viewBox="0 0 100 100" style="width:44%;margin:0 auto -30%;position:relative;z-index:2;">
+          <circle cx="50" cy="50" r="44" fill="#FFD166"/>
+          <path d="M36 44 q3 -4 6 0 M58 44 q3 -4 6 0" stroke="#1a1200" stroke-width="3" fill="none" stroke-linecap="round"/>
+          <path d="M38 62 q12 10 24 0" stroke="#1a1200" stroke-width="4" fill="none" stroke-linecap="round"/>
+        </svg>
+        <svg class="body" viewBox="0 0 200 250">
+          <path d="M68 100 Q34 74 26 42" class="limb"/>
+          <path d="M132 100 Q166 74 174 42" class="limb"/>
+          <ellipse cx="100" cy="128" rx="48" ry="54" fill="#E8B88C"/>
+          <g class="legL"><path d="M84 174 Q76 208 66 238" class="limb"/></g>
+          <g class="legR"><path d="M116 174 Q124 208 134 238" class="limb"/></g>
+          <!-- 胯下馬賽克（喜劇需求，Jesse 指定） -->
+          <g opacity=".95">
+            <rect x="84" y="158" width="11" height="11" fill="#9a9a9a"/>
+            <rect x="95" y="158" width="11" height="11" fill="#6f6f6f"/>
+            <rect x="106" y="158" width="11" height="11" fill="#b0b0b0"/>
+            <rect x="84" y="169" width="11" height="11" fill="#7c7c7c"/>
+            <rect x="95" y="169" width="11" height="11" fill="#a5a5a5"/>
+            <rect x="106" y="169" width="11" height="11" fill="#8a8a8a"/>
+            <rect x="84" y="180" width="11" height="11" fill="#ababab"/>
+            <rect x="95" y="180" width="11" height="11" fill="#818181"/>
+            <rect x="106" y="180" width="11" height="11" fill="#969696"/>
+          </g>
+        </svg>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- 右側欄：QR → 標語 → 貴人計數（結構同 screen.html） -->
+  <div id="sidebar">
+    <div id="qrWrap">
+      <div id="qrBox">
+        <div id="qrPlaceholder">QR Code</div>
+        <img src="qr.png" alt="掃碼加入" onerror="this.remove()">
+      </div>
     </div>
-  </section>
-
-  <!-- 右欄：QR code（區塊黑底、QR 襯白色方塊） -->
-  <section class="col">
-    <div id="qr-box">
-      <img src="qr.png" alt="掃碼加入" onerror="this.style.display='none'; document.getElementById('qr-fallback').style.display='block'">
-      <div id="qr-fallback">（部署後將正式 qr.png 放進 raise-game/，見 tasks 5.2）</div>
+    <div id="ctaWrap"><div id="ctaTitle">掃我！<br>幫柏文加薪</div></div>
+    <div id="counterWrap">
+      <div class="counterLine">已經有</div>
+      <span id="guestCount">0</span>
+      <div class="counterLine">位貴人</div>
     </div>
-    <div id="qr-caption">掃我！<br>幫柏文加薪</div>
-  </section>
-</main>
+  </div>
 
-<!-- 浮動操作面板 -->
-<footer id="controls">
-  <button id="btn-start">開始加薪 <span class="key">S</span></button>
-  <button id="btn-freeze">凍結薪水 <span class="key">F</span></button>
-  <button id="btn-reset">回歸現實 <span class="key">R</span></button>
-  <label>倒數秒數 <input id="sec-input" type="number" min="5" max="600" step="5"></label>
-  <button id="btn-fs">全螢幕 <span class="key">Enter</span></button>
-</footer>
+  <div id="error-banner">⚠ Firebase 初始化失敗，請檢查 firebase-config.js（見 docs/firebase-setup.md）</div>
+</div>
+
+<!-- 操作介面（同 screen.html 語彙） -->
+<button id="cogBtn">⚙ 控制台 (C)</button>
+<button id="fsBtn">⛶ 全螢幕 (Enter)</button>
+<div id="stat"></div>
+
+<div id="panel">
+  <h3>控制台</h3>
+  <p class="hint">遊戲流程：<b>開始 → 觀眾狂按 → 倒數歸零自動凍結（或手動凍結）→ 回歸現實歸零</b>。歸零要按兩次確認。</p>
+  <div class="acts">
+    <button id="btn-start">開始加薪</button>
+    <button id="btn-freeze">凍結薪水</button>
+    <button id="btn-reset">回歸現實</button>
+  </div>
+  <label>倒數秒數（下次開始生效）</label>
+  <input id="sec-input" type="number" min="5" max="600" step="5">
+  <div class="keys">S 開始 · F 凍結 · R×2 歸零 · Enter 全螢幕 · C 控制台 · ↑↓ 對位（Shift 大步、0 歸零）</div>
+</div>
 
 <script type="module">
 import { firebaseConfig, isPlaceholder } from "./firebase-config.js";
@@ -230,7 +293,7 @@ function renderAmount(total) {
         const s = document.createElement("span"); s.textContent = c; el.appendChild(s);
       }
     }
-    fitAmount(); // 位數變多時縮字，確保金額塞在中欄、不壓到 QR 與排行榜
+    fitAmount(); // 位數變多時縮字，確保金額塞在欄位內
   } else {
     // 位數相同：滾動到新數字
     let i = 0;
@@ -240,17 +303,11 @@ function renderAmount(total) {
   }
 }
 
-// 金額字級自適應：先還原成 CSS 基準（min(9.5vw,19vh)），量測後若太寬就等比縮小。
-// 可用寬度用「左排行榜右緣 ↔ 右 QR 左緣」的真實空檔算（中間有大段空白，比窄的中欄格線寬），
-// 金額置中於畫面，取較近一側的兩倍為可用寬，確保永遠不壓到排行榜或 QR。
-// 位數不變的滾動不重算（寬度不變），只在重建結構與視窗縮放時觸發，避免閃動。
+// 金額字級自適應：先還原 CSS 基準，量測後若超出中欄可用寬就等比縮小
 function fitAmount() {
   const el = $("amount");
   el.style.fontSize = "";
-  const board = $("board").getBoundingClientRect();
-  const qr = $("qr-box").getBoundingClientRect();
-  const mid = window.innerWidth / 2;
-  const avail = 2 * Math.min(mid - board.right, qr.left - mid) - 24; // 24px 安全邊界
+  const avail = $("center").clientWidth - 12;
   const w = el.scrollWidth;
   if (w > 0 && avail > 0 && w > avail) {
     const base = parseFloat(getComputedStyle(el).fontSize);
@@ -259,13 +316,13 @@ function fitAmount() {
 }
 window.addEventListener("resize", fitAmount);
 
-// ===== 排行榜 =====
+// ===== 排行榜與貴人計數 =====
 function renderBoard(players) {
   const rows = Object.values(players || {})
     .filter((p) => p && p.name)
-    .sort((a, b) => (b.clicks || 0) - (a.clicks || 0))
-    .slice(0, 10);
-  $("board").innerHTML = rows.map((p, i) =>
+    .sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
+  $("guestCount").textContent = rows.length;
+  $("board").innerHTML = rows.slice(0, 10).map((p, i) =>
     `<li><span class="rank">${i + 1}</span><span class="who">${p.table} ${escapeHtml(p.name)}</span><span class="amt">${fmt((p.clicks || 0) * 1000)}</span></li>`
   ).join("");
 }
@@ -275,30 +332,26 @@ function totalOf(players) {
   return Object.values(players || {}).reduce((sum, p) => sum + (p?.clicks || 0), 0) * 1000;
 }
 
-// ===== 一按一鈔＋柏文狂喜：由金額增量驅動 =====
+// ===== 一按一鈔：由金額增量驅動 =====
 let shownTotal = 0;   // 目前畫面上的總金額（增量計算基準）
-let lastGrowAt = 0;   // 最近一次金額增加的時間（柏文動態依此判斷）
 function applyPlayers(players) {
   latestPlayers = players || {};
   const total = totalOf(latestPlayers);
   const delta = total - shownTotal;
-  if (delta > 0) {
-    lastGrowAt = Date.now();
-    if (gameState === "running") spawnBills(delta / 1000); // 每 +$1,000 一張
-  }
+  if (delta > 0 && gameState === "running") spawnBills(delta / 1000); // 每 +$1,000 一張
   shownTotal = total;
   renderAmount(total);
   renderBoard(latestPlayers);
 }
 
-// ===== 千元鈔飄落：同屏上限 40，超出略過不排隊；落出畫面即移除 DOM =====
+// ===== 千元鈔飄落：深淺黃色系（QQQQAAAA token），同屏上限 40，超出略過 =====
 const BILL_SVG = encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="80" viewBox="0 0 180 80">
-    <rect width="180" height="80" rx="8" fill="#3d6bb0"/>
-    <rect x="6" y="6" width="168" height="68" rx="5" fill="none" stroke="#a8c4e8" stroke-width="2"/>
-    <circle cx="45" cy="40" r="22" fill="#5583c4"/>
-    <text x="112" y="48" font-family="sans-serif" font-size="26" font-weight="bold" fill="#eaf1fb" text-anchor="middle">1000</text>
-    <text x="45" y="46" font-family="serif" font-size="18" fill="#eaf1fb" text-anchor="middle">仟</text>
+    <rect width="180" height="80" rx="8" fill="#FFD166"/>
+    <rect x="6" y="6" width="168" height="68" rx="5" fill="none" stroke="#B9873B" stroke-width="2"/>
+    <circle cx="45" cy="40" r="22" fill="#FFE9B8"/>
+    <text x="112" y="48" font-family="sans-serif" font-size="26" font-weight="bold" fill="#1a1200" text-anchor="middle">1000</text>
+    <text x="45" y="46" font-family="serif" font-size="18" fill="#1a1200" text-anchor="middle">仟</text>
   </svg>`
 );
 const MAX_BILLS = 40;
@@ -310,21 +363,13 @@ function spawnBills(count) {
     img.className = "bill";
     img.src = `data:image/svg+xml,${BILL_SVG}`;
     img.style.left = Math.random() * 88 + "%";
-    img.style.width = 4 + Math.random() * 4 + "vw";
+    img.style.width = 3 + Math.random() * 3 + "vw";
     img.style.animationDuration = 3.5 + Math.random() * 3 + "s";
     img.style.animationDelay = Math.random() * 0.5 + "s"; // 同批錯開，不要整排齊落
     img.addEventListener("animationend", () => img.remove());
     $("bills").appendChild(img);
   }
 }
-
-// ===== 柏文狂喜動態：最近 1 秒有增加→彈跳；安靜→靜止；凍結→定格慶祝 =====
-setInterval(() => {
-  const el = $("powen");
-  if (gameState === "frozen") { el.classList.remove("excited"); el.classList.add("celebrate"); return; }
-  el.classList.remove("celebrate");
-  el.classList.toggle("excited", gameState === "running" && Date.now() - lastGrowAt < 1000);
-}, 250);
 
 // ===== 倒數計時（投影端是唯一權威） =====
 let tickTimer = null;
@@ -341,8 +386,7 @@ function startCountdown(endsAt) {
   tick();
   tickTimer = setInterval(tick, 200);
 }
-// 只停 UI 與計時器，「不」清 endsAt——否則載入時的初始 idle render 會把上一回合的
-// endsAt 抹掉，Firebase 之後回報 running 時讀到 NaN，續跑與自動凍結兩分支永遠不執行。
+// 只停 UI 與計時器，「不」清 endsAt——running 中重新整理要靠它續跑
 function stopCountdown() {
   clearInterval(tickTimer); tickTimer = null;
   $("countdown").classList.remove("on", "urgent");
@@ -365,7 +409,7 @@ function doReset() {
   if (!resetArmed) {
     // 第一次按：進入確認狀態，2 秒內再按一次才真的歸零
     $("btn-reset").classList.add("confirming");
-    $("btn-reset").innerHTML = '再按一次確認歸零 <span class="key">R</span>';
+    $("btn-reset").textContent = "再按一次確認歸零";
     resetArmed = setTimeout(disarmReset, 2000);
     return;
   }
@@ -377,18 +421,20 @@ function doReset() {
 function disarmReset() {
   clearTimeout(resetArmed); resetArmed = null;
   $("btn-reset").classList.remove("confirming");
-  $("btn-reset").innerHTML = '回歸現實 <span class="key">R</span>';
+  $("btn-reset").textContent = "回歸現實";
 }
 
 $("btn-start").addEventListener("click", doStart);
 $("btn-freeze").addEventListener("click", doFreeze);
 $("btn-reset").addEventListener("click", doReset);
 
-// ===== 全螢幕（iPhone Safari 不支援則隱藏） =====
+// ===== 控制台切換（C）與全螢幕（Enter），同 screen.html =====
+function togglePanel() { $("panel").classList.toggle("open"); }
+$("cogBtn").addEventListener("click", togglePanel);
 if (!document.documentElement.requestFullscreen) {
-  $("btn-fs").style.display = "none";
+  $("fsBtn").style.display = "none";
 } else {
-  $("btn-fs").addEventListener("click", toggleFullscreen);
+  $("fsBtn").addEventListener("click", toggleFullscreen);
 }
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();
@@ -422,25 +468,17 @@ document.addEventListener("keydown", (e) => {
     case "s": case "S": doStart(); break;
     case "f": case "F": doFreeze(); break;
     case "r": case "R": doReset(); break;
+    case "c": case "C": togglePanel(); break;
     case "Enter":
       if (document.documentElement.requestFullscreen) { e.preventDefault(); toggleFullscreen(); }
       break;
   }
 });
 
-// ===== 操作面板閒置淡出：3 秒沒動滑鼠就隱藏，移動喚回（快捷鍵不受影響） =====
-let ctlTimer = null;
-function wakeControls() {
-  $("controls").classList.remove("hidden");
-  clearTimeout(ctlTimer);
-  ctlTimer = setTimeout(() => $("controls").classList.add("hidden"), 3000);
-}
-document.addEventListener("pointermove", wakeControls);
-wakeControls();
-
 // ===== 狀態反映到畫面 =====
 function renderState(prev) {
   document.body.classList.toggle("frozen", gameState === "frozen");
+  document.body.classList.toggle("running", gameState === "running");
   $("btn-start").disabled = gameState !== "idle";
   $("btn-freeze").disabled = gameState !== "running";
   if (gameState !== "running") stopCountdown();
@@ -454,6 +492,12 @@ function renderState(prev) {
     else if (endsAt) { stopCountdown(); doFreeze(); }
   }
 }
+
+// ===== 左下狀態列（同 screen.html 的 #stat）=====
+setInterval(() => {
+  const n = Object.values(latestPlayers || {}).filter((p) => p && p.name).length;
+  $("stat").textContent = `狀態 ${gameState} · 貴人 ${n} · 鈔票 ${$("bills").childElementCount}` + (db ? "" : " · 未連線");
+}, 500);
 
 // ===== Firebase 初始化與訂閱（投影端是唯一持有常駐連線的頁面） =====
 async function initFirebase() {
@@ -475,7 +519,7 @@ async function initFirebase() {
 
 renderAmount(0);
 renderState();
-initFirebase().catch(() => { $("error-banner").style.display = "block"; });
+initFirebase().catch(() => { $("error-banner").style.display = "flex"; });
 
 // 測試掛鉤（彩排／驗證用）：
 //   __raise.mockPlayers({p1:{table:'B12',name:'小明',clicks:150}, ...})
