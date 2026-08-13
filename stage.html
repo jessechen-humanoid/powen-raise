@@ -64,7 +64,7 @@
   #pill-timer.urgent { color: #ff6b6b; border-color: #ff6b6b; animation: pulse .5s infinite alternate; }
   @keyframes pulse { to { transform: scale(1.12); } }
   #amount {
-    font-size: min(8.5vw, 18vh); font-weight: 900; color: var(--ink);
+    font-size: min(7.2vw, 15vh); font-weight: 900; color: var(--ink);
     line-height: 1.15; white-space: nowrap;
     text-shadow: 0 2px 10px #000, 0 0 4vh rgba(255, 209, 102, .22);
   }
@@ -95,7 +95,7 @@
   #runner { position: absolute; bottom: 0; left: 0;
     animation: run 7s ease-in-out infinite alternate; animation-play-state: paused; }
   #runner .flip { animation: flip 14s step-end infinite; animation-play-state: paused; }
-  .powen { position: relative; width: 13vh; }
+  .powen { position: relative; width: 20vh; }
   /* 頭壓進軀幹頂（深疊 46%），看起來才像長在身上而不是飄著 */
   .powen .head { display: block; width: 56%; margin: 0 auto -46%; position: relative; z-index: 2; }
   .powen .head-fallback { display: none; }
@@ -109,7 +109,7 @@
   body.running #runner .legL, body.running #runner .legR { animation-play-state: running; }
   /* 凍結：停在原地、微微上抬定格慶祝 */
   body.frozen #runner .powen { transform: translateY(-1.5vh); }
-  @keyframes run { from { transform: translateX(0); } to { transform: translateX(calc(47vw - 14vh)); } }
+  @keyframes run { from { transform: translateX(0); } to { transform: translateX(calc(47vw - 21vh)); } }
   @keyframes flip { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
   @keyframes bob { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-1.2vh) rotate(2deg); } }
   @keyframes kickL { from { transform: rotate(-24deg); } to { transform: rotate(20deg); } }
@@ -146,8 +146,9 @@
   #panel .hint { font-size: 11px; color: #777; line-height: 1.5; margin: 0 0 12px; }
   #panel label { display: block; font-size: 12px; color: #9aa; margin: 12px 0 4px; }
   #panel input { width: 100%; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid #333; background: #000; color: #fff; font-family: inherit; }
-  #panel .acts { display: flex; gap: 8px; margin-top: 6px; }
-  #panel .acts button { flex: 1; font-size: 14px; font-weight: 800; padding: 10px 0; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; }
+  /* 動作鈕直排全寬，中文標籤不擠 */
+  #panel .acts { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+  #panel .acts button { width: 100%; font-size: 15px; font-weight: 800; padding: 12px 0; border: none; border-radius: 8px; cursor: pointer; font-family: inherit; }
   #btn-start { background: #fff; color: #000; }
   #btn-start:disabled, #btn-freeze:disabled { opacity: .35; cursor: default; }
   #btn-freeze { background: #000; color: #ccc; border: 1px solid #333 !important; }
@@ -238,7 +239,7 @@
 
 <div id="panel">
   <h3>控制台</h3>
-  <p class="hint">遊戲流程：<b>開始 → 觀眾狂按 → 倒數歸零自動凍結（或手動凍結）→ 回歸現實歸零</b>。歸零要按兩次確認。</p>
+  <p class="hint">遊戲流程：<b>開始 → 觀眾狂按 → 倒數歸零自動凍結（或手動凍結）→ 回歸現實歸零</b>。歸零要按兩次確認。<br>凍結後「開始加薪」會鎖住，先按兩次「回歸現實」歸零才能開新回合（不是當機）。</p>
   <div class="acts">
     <button id="btn-start">開始加薪</button>
     <button id="btn-freeze">凍結薪水</button>
@@ -323,17 +324,55 @@ function fitAmount() {
 }
 window.addEventListener("resize", fitAmount);
 
-// ===== 排行榜與貴人計數 =====
+// ===== 排行榜與貴人計數（FLIP 動畫：重排時滑動、新進淡入） =====
+const boardRows = new Map(); // playerId -> <li>（重用節點才能做位移動畫）
 function renderBoard(players) {
-  const rows = Object.values(players || {})
-    .filter((p) => p && p.name)
-    .sort((a, b) => (b.clicks || 0) - (a.clicks || 0));
-  $("guestCount").textContent = rows.length;
-  $("board").innerHTML = rows.slice(0, 10).map((p, i) =>
-    `<li><span class="rank">${i + 1}</span><span class="who">${p.table} ${escapeHtml(p.name)}</span><span class="amt">${fmt((p.clicks || 0) * 1000)}</span></li>`
-  ).join("");
+  const entries = Object.entries(players || {})
+    .filter(([, p]) => p && p.name)
+    .sort((a, b) => (b[1].clicks || 0) - (a[1].clicks || 0));
+  $("guestCount").textContent = entries.length;
+  const top = entries.slice(0, 10);
+  const board = $("board");
+
+  // FLIP 第一步：記錄每列目前的畫面位置
+  const firstTop = new Map();
+  for (const [id, li] of boardRows) firstTop.set(id, li.getBoundingClientRect().top);
+
+  // 依新名次重建順序（appendChild 會把既有節點搬到新位置）；文字用 textContent，天然防注入
+  const seen = new Set();
+  top.forEach(([id, p], i) => {
+    seen.add(id);
+    let li = boardRows.get(id);
+    if (!li) {
+      li = document.createElement("li");
+      li.innerHTML = '<span class="rank"></span><span class="who"></span><span class="amt"></span>';
+      li.style.opacity = "0"; // 新進榜：先透明，稍後淡入
+      boardRows.set(id, li);
+    }
+    li.querySelector(".rank").textContent = i + 1;
+    li.querySelector(".who").textContent = `${p.table} ${p.name}`;
+    li.querySelector(".amt").textContent = fmt((p.clicks || 0) * 1000);
+    board.appendChild(li);
+  });
+  for (const [id, li] of [...boardRows]) {
+    if (!seen.has(id)) { li.remove(); boardRows.delete(id); } // 掉出前十名
+  }
+
+  // FLIP 第二步：從舊位置平滑滑到新位置；新進列淡入
+  for (const [id, li] of boardRows) {
+    const from = firstTop.get(id);
+    if (from === undefined) {
+      requestAnimationFrame(() => { li.style.transition = "opacity .4s ease"; li.style.opacity = "1"; });
+      continue;
+    }
+    const dy = from - li.getBoundingClientRect().top;
+    if (dy) {
+      li.style.transition = "none";
+      li.style.transform = `translateY(${dy}px)`;
+      requestAnimationFrame(() => { li.style.transition = "transform .4s ease"; li.style.transform = ""; });
+    }
+  }
 }
-function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`); }
 
 function totalOf(players) {
   return Object.values(players || {}).reduce((sum, p) => sum + (p?.clicks || 0), 0) * 1000;
@@ -378,14 +417,16 @@ function spawnBills(count) {
   }
 }
 
-// ===== 倒數碼錶（MM:SS，投影端是唯一權威） =====
-const fmtClock = (sec) => {
-  const s = Math.max(0, sec);
-  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+// ===== 倒數碼錶（SS:cc＝剩餘秒數:百分秒，投影端是唯一權威） =====
+const fmtClock = (ms) => {
+  const t = Math.max(0, ms);
+  const ss = Math.floor(t / 1000);
+  const cc = Math.floor((t % 1000) / 10);
+  return String(ss).padStart(2, "0") + ":" + String(cc).padStart(2, "0");
 };
-// idle 時碼錶預覽本回合設定秒數（90 → 01:30）
+// idle 時碼錶預覽本回合設定秒數（90 → 90:00）
 function previewClock() {
-  $("pill-timer").textContent = fmtClock(parseInt($("sec-input").value, 10) || DEFAULT_SECONDS);
+  $("pill-timer").textContent = fmtClock((parseInt($("sec-input").value, 10) || DEFAULT_SECONDS) * 1000);
   $("pill-timer").classList.remove("urgent");
 }
 let tickTimer = null;
@@ -393,13 +434,13 @@ function startCountdown(endsAt) {
   localStorage.setItem(ENDS_KEY, endsAt);
   clearInterval(tickTimer);
   const tick = () => {
-    const remain = Math.ceil((endsAt - Date.now()) / 1000);
-    if (remain <= 0) { $("pill-timer").textContent = fmtClock(0); stopCountdown(); doFreeze(); return; }
-    $("pill-timer").textContent = fmtClock(remain);
-    $("pill-timer").classList.toggle("urgent", remain <= 10);
+    const msLeft = endsAt - Date.now();
+    if (msLeft <= 0) { $("pill-timer").textContent = fmtClock(0); stopCountdown(); doFreeze(); return; }
+    $("pill-timer").textContent = fmtClock(msLeft);
+    $("pill-timer").classList.toggle("urgent", msLeft <= 10000);
   };
   tick();
-  tickTimer = setInterval(tick, 200);
+  tickTimer = setInterval(tick, 50); // 百分秒要看得到在轉
 }
 // 只停計時器，碼錶維持最後顯示值（frozen 定格）；「不」清 endsAt——running 中重新整理要靠它續跑
 function stopCountdown() {
