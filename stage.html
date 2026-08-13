@@ -45,10 +45,12 @@
     white-space: nowrap; overflow: hidden;
     text-shadow: 0 2px 10px #000;
   }
+  /* 第一名整行黃色；第二名起整行象牙白（金額不用黃） */
+  #board li { color: var(--ink); }
   #board li .rank { color: rgba(255,253,246,.5); font-variant-numeric: tabular-nums; text-align: right; }
-  #board li:nth-child(1) .rank, #board li:nth-child(1) .who { color: var(--yellow); }
+  #board li:nth-child(1), #board li:nth-child(1) .rank { color: var(--yellow); }
   #board li .who { overflow: hidden; text-overflow: ellipsis; }
-  #board li .amt { color: var(--yellow); font-variant-numeric: tabular-nums; font-weight: 700; }
+  #board li .amt { font-variant-numeric: tabular-nums; font-weight: 700; }
 
   /* 主區右：表頭列（標籤＋碼錶，與左欄排行榜標題同高同字級）→ 大金額 */
   #center { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-width: 0; z-index: 2; }
