@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>瘋狂按下按鈕，幫柏文加薪吧！</title>
+<style>
+  :root{
+    --bg:#0a0a0a;
+    --ink:#FFFDF6;
+    --yellow:#FFD166;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    overflow: hidden;
+    user-select: none; -webkit-user-select: none;
+  }
+  /* 設定缺漏警告：比照 QQQQAAAA 的黃底深字樣式 */
+  #error-banner {
+    display: none; width: 100%;
+    background: var(--yellow); color: #1a1200;
+    text-align: center; padding: 10px 14px; font-size: 13px; font-weight: 700;
+    line-height: 1.5;
+  }
+  .screen {
+    display: none; flex: 1; width: 100%;
+    flex-direction: column; align-items: center; padding: 20px 18px 32px;
+  }
+  .screen.active { display: flex; }
+  .tag {
+    align-self: flex-start;
+    color: var(--yellow); font-size: 12px; font-weight: 700;
+    letter-spacing: .18em; margin: 2px 0 8px;
+  }
+  h1 { font-size: 22px; font-weight: 800; text-align: center; color: var(--ink); margin: 4px 0 6px; line-height: 1.4; }
+
+  /* ===== 入場畫面 ===== */
+  #onboarding h1 { align-self: flex-start; text-align: left; }
+  .field-label { align-self: flex-start; font-size: 15px; font-weight: 700; color: var(--ink); margin: 18px 0 8px; }
+  #table-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 100%; }
+  .table-btn {
+    padding: 10px 0; border: 1px solid rgba(255,250,235,.22); border-radius: 10px;
+    background: #1a1a1a; color: var(--ink); font-size: 15px; font-family: inherit;
+  }
+  .table-btn.selected { background: var(--yellow); color: #1a1200; border-color: var(--yellow); font-weight: 700; }
+  #nickname {
+    width: 100%; padding: 14px 12px; font-size: 17px; border-radius: 10px;
+    border: 1px solid rgba(255,250,235,.22); background: #1a1a1a; color: var(--ink);
+    outline: none; font-family: inherit; -webkit-appearance: none; appearance: none;
+  }
+  #nickname:focus { border-color: var(--yellow); }
+  #form-hint { color: #ff6b6b; font-size: 14px; font-weight: 700; min-height: 20px; margin-top: 8px; align-self: flex-start; }
+  #join-btn {
+    margin-top: 12px; width: 100%; min-height: 54px; padding: 16px 0;
+    font-size: 18px; font-weight: 800; font-family: inherit;
+    border: none; border-radius: 12px; background: var(--yellow); color: #1a1200;
+  }
+  #join-btn:disabled { opacity: .55; }
+
+  /* ===== 遊戲畫面 ===== */
+  #player-tag { color: rgba(255,253,246,.55); font-size: 14px; margin-top: 4px; }
+  #status-line { font-size: 16px; color: rgba(255,253,246,.6); min-height: 24px; text-align: center; margin-top: 14px; }
+  #my-amount {
+    font-size: 42px; font-weight: 800; color: var(--yellow);
+    margin: 6px 0 0; font-variant-numeric: tabular-nums;
+  }
+  #my-amount-label { font-size: 13px; color: rgba(255,253,246,.6); }
+  /* 平面黃色大圓鈕：純 #FFD166 底＋深色字，無漸層無 inset，僅一層柔和外陰影 */
+  #raise-btn {
+    margin: auto 0;
+    width: min(72vw, 300px); height: min(72vw, 300px);
+    border-radius: 50%; border: none; font-family: inherit;
+    background: var(--yellow);
+    color: #1a1200; font-size: min(17vw, 72px); font-weight: 900; letter-spacing: 6px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .45);
+    touch-action: manipulation;
+  }
+  #raise-btn.pop { animation: pop .12s; }
+  @keyframes pop { 50% { transform: scale(.92); } }
+  body.frozen #raise-btn {
+    background: #3a3a3a; color: rgba(255,253,246,.4); box-shadow: none; pointer-events: none;
+  }
+  #final-box { display: none; text-align: center; margin-bottom: 28px; }
+  body.frozen #final-box { display: block; }
+  #final-box .label { color: rgba(255,253,246,.6); font-size: 17px; }
+  #final-box .num { color: var(--yellow); font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  body.frozen #my-amount, body.frozen #my-amount-label { opacity: .45; }
+</style>
+</head>
+<body>
+<div id="error-banner">尚未設定 Firebase（請照 docs/firebase-setup.md 填 firebase-config.js）</div>
+
+<!-- 入場畫面 -->
+<section id="onboarding" class="screen">
+  <div class="tag">支薪好友專場</div>
+  <h1>瘋狂按下按鈕，<br>幫柏文加薪吧！</h1>
+  <div class="field-label">你坐哪一桌？</div>
+  <div id="table-grid"></div>
+  <div class="field-label">你的暱稱（最多 4 個字）</div>
+  <input id="nickname" maxlength="4" placeholder="例：歐北貴人" autocomplete="off">
+  <div id="form-hint"></div>
+  <button id="join-btn" disabled>成為柏文的貴人</button>
+</section>
+
+<!-- 遊戲畫面 -->
+<section id="game" class="screen">
+  <h1>幫柏文加薪！</h1>
+  <div id="player-tag"></div>
+  <div id="status-line"></div>
+  <div id="my-amount">$0</div>
+  <div id="my-amount-label">你幫柏文加的薪水</div>
+  <button id="raise-btn">加薪</button>
+  <div id="final-box">
+    <div class="label">柏文最終加薪</div>
+    <div class="num" id="final-num">$0</div>
+  </div>
+</section>
+
+<!-- 觀眾端刻意不載 Firebase SDK：SDK 會佔一條常駐連線，免費方案（Spark）
+     只有 100 條，觀眾 300 人同時開頁必爆。所有讀寫改用 REST 一次性請求：
+     入場 PUT、點擊 PATCH 原子遞增、狀態每 2 秒輪詢 GET。
+     常駐連線只留給 stage.html（1 條）。做法與 QQQQAAAA submit.html 相同。 -->
+<script type="module">
+import { REST_BASE, isPlaceholder } from "./firebase-config.js";
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => "$" + n.toLocaleString("en-US");
+// crypto.randomUUID() 只在 HTTPS/localhost（secure context）存在；實機彩排走區網 IP 的 http 時
+// 會是 undefined，故備援一組夠獨特的 id，避免入場按鈕靜默拋錯。
+const newId = () =>
+  (crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : "p-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+
+// ---- 本地身分 ----
+const STORE_KEY = "raise.player";
+let player = null; // { id, table, name }
+try { player = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (_) { /* 壞資料當作未入場 */ }
+
+// ---- 桌次選單 B3–B32 ----
+const TABLES = Array.from({ length: 30 }, (_, i) => "B" + (i + 3));
+let selectedTable = null;
+for (const t of TABLES) {
+  const btn = document.createElement("button");
+  btn.className = "table-btn";
+  btn.textContent = t;
+  btn.addEventListener("click", () => {
+    selectedTable = t;
+    document.querySelectorAll(".table-btn").forEach((b) => b.classList.toggle("selected", b === btn));
+    validateForm();
+  });
+  $("table-grid").appendChild(btn);
+}
+
+function nicknameError(raw) {
+  const name = raw.trim();
+  if (!name) return "暱稱不能是空白";
+  if ([...name].length > 4 || name.length > 4) return "暱稱最多 4 個字";
+  return null;
+}
+function validateForm() {
+  const err = nicknameError($("nickname").value);
+  $("form-hint").textContent = $("nickname").value && err ? err : "";
+  $("join-btn").disabled = !selectedTable || !!err;
+}
+$("nickname").addEventListener("input", validateForm);
+
+$("join-btn").addEventListener("click", () => {
+  const err = nicknameError($("nickname").value);
+  if (err || !selectedTable) { $("form-hint").textContent = err || "請先選桌次"; return; }
+  player = { id: newId(), table: selectedTable, name: $("nickname").value.trim() };
+  localStorage.setItem(STORE_KEY, JSON.stringify(player));
+  enterGame();
+});
+
+// ---- 畫面切換 ----
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.toggle("active", s.id === id));
+}
+
+// ---- 遊戲狀態 ----
+let gameState = "idle";
+let localClicks = 0;   // 本地顯示用累積（含未上傳）
+let pending = 0;       // 待上傳點擊數
+
+const playerUrl = () => `${REST_BASE}/raise/players/${player.id}.json`;
+
+function renderState() {
+  document.body.classList.toggle("frozen", gameState === "frozen");
+  const line = { idle: "還沒開始，先熱身搓搓手指⋯", running: "衝啊！狂按就對了！", frozen: "加薪結束" };
+  $("status-line").textContent = line[gameState] || "";
+}
+function renderMyAmount() { $("my-amount").textContent = fmt(localClicks * 1000); }
+
+function enterGame() {
+  showScreen("game");
+  $("player-tag").textContent = `${player.table}・${player.name}`;
+  renderState();
+  renderMyAmount();
+  ensurePlayerNode();
+}
+
+// 玩家節點不存在時建立（首次入場、或被「回歸現實」清空後）——一次性 GET＋PUT
+async function ensurePlayerNode() {
+  if (!REST_BASE || !player) return;
+  try {
+    const res = await fetch(playerUrl());
+    if (!res.ok) throw new Error();
+    const val = await res.json();
+    if (val === null) {
+      localClicks = 0; pending = 0;
+      await fetch(playerUrl(), {
+        method: "PUT",
+        body: JSON.stringify({ table: player.table, name: player.name, clicks: 0 }),
+      });
+    } else {
+      localClicks = (val.clicks || 0) + pending;
+    }
+  } catch (_) { /* 離線時先用本地值，恢復後下次狀態變更會再同步 */ }
+  renderMyAmount();
+}
+
+// ---- 加薪按鈕 ----
+$("raise-btn").addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  const btn = $("raise-btn");
+  btn.classList.remove("pop");
+  void btn.offsetWidth; // 重新觸發動畫
+  btn.classList.add("pop");
+  if (gameState !== "running") return; // idle：只有動畫回饋，不計分
+  localClicks++; pending++;
+  renderMyAmount();
+});
+
+// ---- 批次上傳：每秒最多一次 PATCH 原子遞增，單次封頂 15，超出捨棄 ----
+// {".sv":{"increment":n}} 是 RTDB REST 版的 ServerValue.increment 寫法。
+const FLUSH_CAP = 15;
+let inFlight = false;
+async function flush() {
+  if (!REST_BASE || !player || pending <= 0 || gameState !== "running" || inFlight) return;
+  const n = Math.min(pending, FLUSH_CAP);
+  pending = 0; // 超過封頂的部分依 spec 捨棄
+  inFlight = true;
+  try {
+    const res = await fetch(playerUrl(), {
+      method: "PATCH",
+      body: JSON.stringify({ clicks: { ".sv": { increment: n } } }),
+      keepalive: true, // 頁面切背景時也把這筆送完
+    });
+    // 4xx＝被規則拒絕（例如剛好凍結），直接放掉；只有網路層失敗才還原補傳
+    if (!res.ok && res.status >= 500) pending += n;
+  } catch (_) {
+    pending += n; // 斷網：還原待傳數，恢復後下一輪 flush 補傳（仍受單次封頂）
+  } finally {
+    inFlight = false;
+  }
+}
+setInterval(flush, 1000);
+
+// 凍結瞬間試著把殘餘點擊送出（規則可能已拒絕，失敗無妨、不還原）
+function flushOnFreeze() {
+  if (!REST_BASE || !player || pending <= 0) return;
+  const n = Math.min(pending, FLUSH_CAP);
+  pending = 0;
+  fetch(playerUrl(), {
+    method: "PATCH",
+    body: JSON.stringify({ clicks: { ".sv": { increment: n } } }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+// ---- 狀態同步：每 2 秒輪詢 GET（不佔常駐連線）；頁面隱藏時暫停 ----
+const POLL_MS = 2000;
+let polling = false;
+async function pollState() {
+  if (!REST_BASE || polling) return;
+  polling = true;
+  try {
+    const res = await fetch(`${REST_BASE}/raise/state.json`);
+    if (!res.ok) throw new Error();
+    const next = (await res.json()) || "idle";
+    applyState(next);
+  } catch (_) { /* 網路暫時失敗：保持現狀，下一輪再試 */ }
+  polling = false;
+}
+function applyState(next) {
+  const prev = gameState;
+  gameState = next;
+  if (next === "frozen" && prev !== "frozen") { flushOnFreeze(); fetchFinalTotal(); }
+  if (next === "idle" && prev !== "idle" && player) ensurePlayerNode(); // 回歸現實後重建節點
+  renderState();
+}
+async function fetchFinalTotal() {
+  try {
+    const res = await fetch(`${REST_BASE}/raise/finalTotal.json`);
+    if (res.ok) $("final-num").textContent = fmt((await res.json()) || 0);
+  } catch (_) { /* 拿不到就維持上次顯示 */ }
+}
+setInterval(() => { if (!document.hidden) pollState(); }, POLL_MS);
+document.addEventListener("visibilitychange", () => {
+  flush(); // 切背景前把待傳點擊送出
+  if (!document.hidden) pollState(); // 回前景立刻同步一次，不等下一輪
+});
+
+// ---- 啟動 ----
+if (isPlaceholder || !REST_BASE) {
+  $("error-banner").style.display = "block";
+} else {
+  pollState();
+}
+if (player) enterGame(); else showScreen("onboarding");
+
+// 測試掛鉤（彩排／驗證用）：__raise.mockState('running')
+window.__raise = {
+  mockState(s) { applyState(s); },
+  get info() { return { player, gameState, localClicks, pending }; },
+};
+</script>
+</body>
+</html>

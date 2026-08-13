@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>幫柏文加薪 — 舞台投影</title>
+<style>
+  :root{
+    --bg:#0a0a0a;
+    --ink:#FFFDF6;
+    --yellow:#FFD166;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  }
+  #error-banner {
+    display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 99;
+    background: #1a0d0d; color: #ff7b78; text-align: center; padding: 1vh; font-size: 2.2vh; font-weight: 700;
+  }
+
+  /* ===== 三欄版面 28 / 44 / 28（--yoff 由 ↑↓ 微調投影對位，存 localStorage） ===== */
+  #stage {
+    display: grid; grid-template-columns: 28fr 44fr 28fr;
+    gap: 2vw; width: 100vw; height: 100vh;
+    padding: 4vh 2.5vw 11vh;
+    transform: translateY(var(--yoff, 0vh));
+  }
+  .col { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+
+  /* ----- 左欄：排行榜 ----- */
+  #board-title { font-size: 4.2vh; color: var(--yellow); font-weight: 900; margin-bottom: 2.5vh; letter-spacing: .3vh; }
+  #board { width: 100%; list-style: none; }
+  #board li {
+    display: grid; grid-template-columns: 3.8vh minmax(0, 1fr) auto;
+    align-items: baseline; gap: .5vw;
+    font-size: 4.2vh; line-height: 1.55; font-weight: 700;
+    white-space: nowrap; overflow: hidden;
+  }
+  #board li .rank { color: rgba(255,253,246,.5); font-variant-numeric: tabular-nums; font-size: .68em; text-align: right; }
+  #board li:nth-child(1) .rank, #board li:nth-child(1) .who { color: var(--yellow); }
+  #board li .who { overflow: hidden; text-overflow: ellipsis; }
+  #board li .amt { color: var(--yellow); font-variant-numeric: tabular-nums; font-weight: 700; font-size: .62em; }
+
+  /* ----- 中欄：倒數＋金額＋柏文 ----- */
+  #center { position: relative; justify-content: flex-start; }
+  #countdown {
+    visibility: hidden;
+    font-size: 9vh; font-weight: 900; color: var(--yellow);
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+    margin-bottom: 1vh; z-index: 2;
+  }
+  #countdown.on { visibility: visible; }
+  #countdown.urgent { color: #ff6b6b; animation: pulse .5s infinite alternate; }
+  @keyframes pulse { to { transform: scale(1.12); } }
+  #amount-label { font-size: 4.5vh; color: rgba(255,253,246,.6); letter-spacing: .5vh; z-index: 2; }
+  #amount {
+    font-size: min(9.5vw, 19vh); font-weight: 900; color: var(--ink);
+    line-height: 1.15; z-index: 2; white-space: nowrap;
+    text-shadow: 0 0 4vh rgba(255, 209, 102, .22);
+  }
+  #amount .odo { display: inline-block; height: 1.15em; overflow: hidden; vertical-align: bottom; }
+  #amount .strip { display: flex; flex-direction: column; transition: transform .45s cubic-bezier(.2, .7, .3, 1); }
+  #amount .strip span { height: 1.15em; line-height: 1.15em; }
+  body.frozen #amount { color: var(--yellow); animation: settle .8s; }
+  @keyframes settle {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.14); }
+    70% { transform: scale(.97); }
+    100% { transform: scale(1); }
+  }
+  #frozen-tag { visibility: hidden; font-size: 4vh; color: #ff6b6b; font-weight: 800; margin-top: 2vh; letter-spacing: .5vh; z-index: 2; }
+  body.frozen #frozen-tag { visibility: visible; }
+
+  /* 柏文狂喜動態：金額最近 1 秒有增加才彈跳，安靜時回靜止，凍結定格慶祝姿勢。
+     powen.png 不存在時自動改用內嵌 SVG 小人（換上真照片即生效，零程式改動）。 */
+  #powen { margin-top: auto; margin-bottom: 1vh; z-index: 2; }
+  #powen img, #powen svg { height: 24vh; display: block; }
+  #powen img { border-radius: 50%; border: .6vh solid var(--yellow); background: #1a1a1a; object-fit: cover; aspect-ratio: 1; }
+  #powen.excited { animation: powen-bounce .5s ease-in-out infinite; }
+  @keyframes powen-bounce {
+    0%, 100% { transform: translateY(0) rotate(-2deg); }
+    50% { transform: translateY(-3vh) rotate(2deg); }
+  }
+  #powen.celebrate { transform: translateY(-2vh) scale(1.08); }
+
+  /* 千元鈔（一按一鈔）：低透明度背景層，不遮金額 */
+  #bills { position: absolute; inset: 0; overflow: hidden; z-index: 1; pointer-events: none; }
+  .bill { position: absolute; top: -12vh; opacity: .32; animation: fall linear forwards; }
+  @keyframes fall {
+    from { transform: translateY(0) rotate(-12deg); }
+    to { transform: translateY(120vh) rotate(14deg); }
+  }
+
+  /* ----- 右欄：QR ----- */
+  #qr-box {
+    background: #fff; border-radius: 16px;
+    box-shadow: 0 0 24px rgba(0, 0, 0, .6);
+    width: min(22vw, 44vh); height: min(22vw, 44vh);
+    padding: 1.8vh; display: flex; align-items: center; justify-content: center;
+  }
+  #qr-box img { width: 100%; height: 100%; object-fit: contain; }
+  #qr-fallback { display: none; color: #333; font-size: 2.4vh; text-align: center; padding: 1vh; }
+  #qr-caption { margin-top: 2.5vh; font-size: 3.8vh; color: var(--yellow); font-weight: 900; text-align: center; line-height: 1.5; }
+
+  /* ===== 浮動操作面板（後台人員用）：閒置 3 秒淡出，滑鼠移動喚回 ===== */
+  #controls {
+    position: fixed; left: 50%; bottom: 2vh; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 1vw;
+    background: #111; border: 1px solid #2a2a2a; border-radius: 14px;
+    padding: 1.4vh 1.4vw;
+    font-size: 2.2vh; z-index: 50;
+    transition: opacity .4s ease;
+  }
+  #controls.hidden { opacity: 0; pointer-events: none; }
+  #controls button {
+    padding: 1.2vh 1.4vw; font-size: 2.2vh; font-weight: 700; font-family: inherit;
+    border: 1px solid #333; border-radius: 8px;
+    background: #000; color: #ddd; cursor: pointer;
+  }
+  #controls button:disabled { opacity: .35; cursor: default; }
+  #btn-reset.confirming { background: #1a0d0d; border-color: #ff6b6b; color: #ff7b78; }
+  #controls label { color: #9aa; }
+  #sec-input {
+    width: 5.5vw; min-width: 64px; padding: 1vh .5vw; font-size: 2.2vh; text-align: center; font-family: inherit;
+    border: 1px solid #333; border-radius: 8px; background: #000; color: var(--ink);
+  }
+  #controls .key { color: #777; font-size: 1.8vh; }
+</style>
+</head>
+<body>
+<div id="error-banner">Firebase 初始化失敗，請檢查 firebase-config.js（見 docs/firebase-setup.md）</div>
+
+<main id="stage">
+  <!-- 左欄：TOP10 貴人 -->
+  <section class="col">
+    <div id="board-title">柏文 TOP10 貴人</div>
+    <ol id="board"></ol>
+  </section>
+
+  <!-- 中欄：倒數＋累積金額＋柏文 -->
+  <section class="col" id="center">
+    <div id="bills"></div>
+    <div id="countdown">90</div>
+    <div id="amount-label">柏文目前已加薪</div>
+    <div id="amount"></div>
+    <div id="frozen-tag">— 薪水已凍結 —</div>
+    <div id="powen">
+      <img src="powen.png" alt="柏文" onerror="this.remove(); document.getElementById('powen-fallback').style.display='block'">
+      <svg id="powen-fallback" style="display:none" viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+        <!-- 佔位小人（QQQQAAAA token 色）：雙手高舉的狂喜姿勢 -->
+        <circle cx="50" cy="26" r="16" fill="#FFD166"/>
+        <path d="M42 22 q3 -4 6 0 M54 22 q3 -4 6 0" stroke="#1a1200" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path d="M41 32 q9 8 18 0" stroke="#1a1200" stroke-width="3" fill="none" stroke-linecap="round"/>
+        <path d="M50 42 v34 M50 50 L24 24 M50 50 L76 24 M50 76 L34 108 M50 76 L66 108"
+              stroke="#FFFDF6" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- 右欄：QR code（區塊黑底、QR 襯白色方塊） -->
+  <section class="col">
+    <div id="qr-box">
+      <img src="qr.png" alt="掃碼加入" onerror="this.style.display='none'; document.getElementById('qr-fallback').style.display='block'">
+      <div id="qr-fallback">（部署後將正式 qr.png 放進 raise-game/，見 tasks 5.2）</div>
+    </div>
+    <div id="qr-caption">掃我！<br>幫柏文加薪</div>
+  </section>
+</main>
+
+<!-- 浮動操作面板 -->
+<footer id="controls">
+  <button id="btn-start">開始加薪 <span class="key">S</span></button>
+  <button id="btn-freeze">凍結薪水 <span class="key">F</span></button>
+  <button id="btn-reset">回歸現實 <span class="key">R</span></button>
+  <label>倒數秒數 <input id="sec-input" type="number" min="5" max="600" step="5"></label>
+  <button id="btn-fs">全螢幕 <span class="key">Enter</span></button>
+</footer>
+
+<script type="module">
+import { firebaseConfig, isPlaceholder } from "./firebase-config.js";
+
+const $ = (id) => document.getElementById(id);
+const fmt = (n) => "$" + n.toLocaleString("en-US");
+
+// ===== 現場可調參數（localStorage，重新整理不用重設） =====
+const SEC_KEY = "raise.countdownSeconds";
+const ENDS_KEY = "raise.endsAt";
+const DEFAULT_SECONDS = 90;
+$("sec-input").value = parseInt(localStorage.getItem(SEC_KEY), 10) || DEFAULT_SECONDS;
+$("sec-input").addEventListener("change", () => {
+  const v = parseInt($("sec-input").value, 10);
+  if (v > 0) localStorage.setItem(SEC_KEY, v); // running 中改值不影響當前回合，下次開始才生效
+});
+
+// ===== 狀態 =====
+let db = null, fb = null;
+let gameState = "idle";
+let latestPlayers = {};
+
+// ===== Odometer 金額動畫 =====
+const DIGITS = "0123456789";
+let odoDigits = []; // 目前的 .strip 元素（由左至右）
+function renderAmount(total) {
+  const str = fmt(total);
+  const el = $("amount");
+  const chars = [...str];
+  const digitCount = chars.filter((c) => DIGITS.includes(c)).length;
+  if (digitCount !== odoDigits.length) {
+    // 位數改變：重建結構（新位數直接定位，不滾動）
+    el.innerHTML = "";
+    odoDigits = [];
+    for (const c of chars) {
+      if (DIGITS.includes(c)) {
+        const odo = document.createElement("span");
+        odo.className = "odo";
+        const strip = document.createElement("span");
+        strip.className = "strip";
+        strip.style.transition = "none";
+        for (const d of DIGITS) { const s = document.createElement("span"); s.textContent = d; strip.appendChild(s); }
+        strip.style.transform = `translateY(${-Number(c) * 1.15}em)`;
+        odo.appendChild(strip);
+        el.appendChild(odo);
+        odoDigits.push(strip);
+        requestAnimationFrame(() => { strip.style.transition = ""; });
+      } else {
+        const s = document.createElement("span"); s.textContent = c; el.appendChild(s);
+      }
+    }
+    fitAmount(); // 位數變多時縮字，確保金額塞在中欄、不壓到 QR 與排行榜
+  } else {
+    // 位數相同：滾動到新數字
+    let i = 0;
+    for (const c of chars) {
+      if (DIGITS.includes(c)) odoDigits[i++].style.transform = `translateY(${-Number(c) * 1.15}em)`;
+    }
+  }
+}
+
+// 金額字級自適應：先還原成 CSS 基準（min(9.5vw,19vh)），量測後若太寬就等比縮小。
+// 可用寬度用「左排行榜右緣 ↔ 右 QR 左緣」的真實空檔算（中間有大段空白，比窄的中欄格線寬），
+// 金額置中於畫面，取較近一側的兩倍為可用寬，確保永遠不壓到排行榜或 QR。
+// 位數不變的滾動不重算（寬度不變），只在重建結構與視窗縮放時觸發，避免閃動。
+function fitAmount() {
+  const el = $("amount");
+  el.style.fontSize = "";
+  const board = $("board").getBoundingClientRect();
+  const qr = $("qr-box").getBoundingClientRect();
+  const mid = window.innerWidth / 2;
+  const avail = 2 * Math.min(mid - board.right, qr.left - mid) - 24; // 24px 安全邊界
+  const w = el.scrollWidth;
+  if (w > 0 && avail > 0 && w > avail) {
+    const base = parseFloat(getComputedStyle(el).fontSize);
+    el.style.fontSize = Math.floor(base * avail / w) + "px";
+  }
+}
+window.addEventListener("resize", fitAmount);
+
+// ===== 排行榜 =====
+function renderBoard(players) {
+  const rows = Object.values(players || {})
+    .filter((p) => p && p.name)
+    .sort((a, b) => (b.clicks || 0) - (a.clicks || 0))
+    .slice(0, 10);
+  $("board").innerHTML = rows.map((p, i) =>
+    `<li><span class="rank">${i + 1}</span><span class="who">${p.table} ${escapeHtml(p.name)}</span><span class="amt">${fmt((p.clicks || 0) * 1000)}</span></li>`
+  ).join("");
+}
+function escapeHtml(s) { return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`); }
+
+function totalOf(players) {
+  return Object.values(players || {}).reduce((sum, p) => sum + (p?.clicks || 0), 0) * 1000;
+}
+
+// ===== 一按一鈔＋柏文狂喜：由金額增量驅動 =====
+let shownTotal = 0;   // 目前畫面上的總金額（增量計算基準）
+let lastGrowAt = 0;   // 最近一次金額增加的時間（柏文動態依此判斷）
+function applyPlayers(players) {
+  latestPlayers = players || {};
+  const total = totalOf(latestPlayers);
+  const delta = total - shownTotal;
+  if (delta > 0) {
+    lastGrowAt = Date.now();
+    if (gameState === "running") spawnBills(delta / 1000); // 每 +$1,000 一張
+  }
+  shownTotal = total;
+  renderAmount(total);
+  renderBoard(latestPlayers);
+}
+
+// ===== 千元鈔飄落：同屏上限 40，超出略過不排隊；落出畫面即移除 DOM =====
+const BILL_SVG = encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="80" viewBox="0 0 180 80">
+    <rect width="180" height="80" rx="8" fill="#3d6bb0"/>
+    <rect x="6" y="6" width="168" height="68" rx="5" fill="none" stroke="#a8c4e8" stroke-width="2"/>
+    <circle cx="45" cy="40" r="22" fill="#5583c4"/>
+    <text x="112" y="48" font-family="sans-serif" font-size="26" font-weight="bold" fill="#eaf1fb" text-anchor="middle">1000</text>
+    <text x="45" y="46" font-family="serif" font-size="18" fill="#eaf1fb" text-anchor="middle">仟</text>
+  </svg>`
+);
+const MAX_BILLS = 40;
+function spawnBills(count) {
+  const room = MAX_BILLS - $("bills").childElementCount;
+  const n = Math.min(count, room); // 超出上限的量直接略過（不排隊），觀感無差且不掉幀
+  for (let i = 0; i < n; i++) {
+    const img = document.createElement("img");
+    img.className = "bill";
+    img.src = `data:image/svg+xml,${BILL_SVG}`;
+    img.style.left = Math.random() * 88 + "%";
+    img.style.width = 4 + Math.random() * 4 + "vw";
+    img.style.animationDuration = 3.5 + Math.random() * 3 + "s";
+    img.style.animationDelay = Math.random() * 0.5 + "s"; // 同批錯開，不要整排齊落
+    img.addEventListener("animationend", () => img.remove());
+    $("bills").appendChild(img);
+  }
+}
+
+// ===== 柏文狂喜動態：最近 1 秒有增加→彈跳；安靜→靜止；凍結→定格慶祝 =====
+setInterval(() => {
+  const el = $("powen");
+  if (gameState === "frozen") { el.classList.remove("excited"); el.classList.add("celebrate"); return; }
+  el.classList.remove("celebrate");
+  el.classList.toggle("excited", gameState === "running" && Date.now() - lastGrowAt < 1000);
+}, 250);
+
+// ===== 倒數計時（投影端是唯一權威） =====
+let tickTimer = null;
+function startCountdown(endsAt) {
+  localStorage.setItem(ENDS_KEY, endsAt);
+  clearInterval(tickTimer);
+  $("countdown").classList.add("on");
+  const tick = () => {
+    const remain = Math.ceil((endsAt - Date.now()) / 1000);
+    if (remain <= 0) { stopCountdown(); doFreeze(); return; }
+    $("countdown").textContent = remain;
+    $("countdown").classList.toggle("urgent", remain <= 10);
+  };
+  tick();
+  tickTimer = setInterval(tick, 200);
+}
+// 只停 UI 與計時器，「不」清 endsAt——否則載入時的初始 idle render 會把上一回合的
+// endsAt 抹掉，Firebase 之後回報 running 時讀到 NaN，續跑與自動凍結兩分支永遠不執行。
+function stopCountdown() {
+  clearInterval(tickTimer); tickTimer = null;
+  $("countdown").classList.remove("on", "urgent");
+}
+
+// ===== 遊戲控制 =====
+function doStart() {
+  if (gameState !== "idle") return;
+  const seconds = parseInt($("sec-input").value, 10) || DEFAULT_SECONDS;
+  if (db) fb.set(fb.ref(db, "raise/state"), "running").catch(() => {});
+  startCountdown(Date.now() + seconds * 1000);
+}
+function doFreeze() {
+  if (gameState !== "running") return;
+  stopCountdown();
+  if (db) fb.update(fb.ref(db, "raise"), { state: "frozen", finalTotal: totalOf(latestPlayers) }).catch(() => {});
+}
+let resetArmed = null;
+function doReset() {
+  if (!resetArmed) {
+    // 第一次按：進入確認狀態，2 秒內再按一次才真的歸零
+    $("btn-reset").classList.add("confirming");
+    $("btn-reset").innerHTML = '再按一次確認歸零 <span class="key">R</span>';
+    resetArmed = setTimeout(disarmReset, 2000);
+    return;
+  }
+  disarmReset();
+  stopCountdown();
+  localStorage.removeItem(ENDS_KEY); // 歸零＝全新一場，清掉續跑用的結束時間
+  if (db) fb.update(fb.ref(db, "raise"), { state: "idle", players: null, finalTotal: null }).catch(() => {});
+}
+function disarmReset() {
+  clearTimeout(resetArmed); resetArmed = null;
+  $("btn-reset").classList.remove("confirming");
+  $("btn-reset").innerHTML = '回歸現實 <span class="key">R</span>';
+}
+
+$("btn-start").addEventListener("click", doStart);
+$("btn-freeze").addEventListener("click", doFreeze);
+$("btn-reset").addEventListener("click", doReset);
+
+// ===== 全螢幕（iPhone Safari 不支援則隱藏） =====
+if (!document.documentElement.requestFullscreen) {
+  $("btn-fs").style.display = "none";
+} else {
+  $("btn-fs").addEventListener("click", toggleFullscreen);
+}
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen();
+}
+
+// ===== 投影對位：↑↓ ±0.5vh、Shift+↑↓ ±2vh、0 歸零，存 localStorage =====
+const YOFF_KEY = "raise.stage.yoff";
+let yOffVh = Number(localStorage.getItem(YOFF_KEY) || 0);
+function applyYOff() {
+  yOffVh = Math.max(-60, Math.min(60, yOffVh));
+  document.documentElement.style.setProperty("--yoff", yOffVh + "vh");
+  localStorage.setItem(YOFF_KEY, yOffVh);
+}
+applyYOff();
+
+// ===== 快捷鍵：單一字母、擋連發、輸入框中不觸發（對位鍵允許按住連發） =====
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  const isUp = e.key === "ArrowUp", isDown = e.key === "ArrowDown";
+  if (isUp || isDown) {
+    e.preventDefault();
+    yOffVh += (isUp ? -1 : 1) * (e.shiftKey ? 2 : 0.5);
+    applyYOff();
+    return;
+  }
+  if (e.key === "0") { yOffVh = 0; applyYOff(); return; }
+  if (e.repeat) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  switch (e.key) {
+    case "s": case "S": doStart(); break;
+    case "f": case "F": doFreeze(); break;
+    case "r": case "R": doReset(); break;
+    case "Enter":
+      if (document.documentElement.requestFullscreen) { e.preventDefault(); toggleFullscreen(); }
+      break;
+  }
+});
+
+// ===== 操作面板閒置淡出：3 秒沒動滑鼠就隱藏，移動喚回（快捷鍵不受影響） =====
+let ctlTimer = null;
+function wakeControls() {
+  $("controls").classList.remove("hidden");
+  clearTimeout(ctlTimer);
+  ctlTimer = setTimeout(() => $("controls").classList.add("hidden"), 3000);
+}
+document.addEventListener("pointermove", wakeControls);
+wakeControls();
+
+// ===== 狀態反映到畫面 =====
+function renderState(prev) {
+  document.body.classList.toggle("frozen", gameState === "frozen");
+  $("btn-start").disabled = gameState !== "idle";
+  $("btn-freeze").disabled = gameState !== "running";
+  if (gameState !== "running") stopCountdown();
+  if (gameState === "running" && !tickTimer) {
+    // 頁面在 running 中重新整理：從 localStorage 續跑倒數
+    const endsAt = parseInt(localStorage.getItem(ENDS_KEY), 10);
+    if (endsAt > Date.now()) startCountdown(endsAt);
+    else if (endsAt) { stopCountdown(); doFreeze(); }
+  }
+}
+
+// ===== Firebase 初始化與訂閱（投影端是唯一持有常駐連線的頁面） =====
+async function initFirebase() {
+  if (isPlaceholder) throw new Error("placeholder config");
+  const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js");
+  const rtdb = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js");
+  const app = initializeApp(firebaseConfig);
+  db = rtdb.getDatabase(app);
+  fb = { ref: rtdb.ref, set: rtdb.set, update: rtdb.update, onValue: rtdb.onValue };
+
+  // 斷線韌性：onValue 只在有新資料時觸發，斷線期間畫面自然保留最後數字
+  fb.onValue(fb.ref(db, "raise/state"), (snap) => {
+    const prev = gameState;
+    gameState = snap.val() || "idle";
+    renderState(prev);
+  });
+  fb.onValue(fb.ref(db, "raise/players"), (snap) => applyPlayers(snap.val()));
+}
+
+renderAmount(0);
+renderState();
+initFirebase().catch(() => { $("error-banner").style.display = "block"; });
+
+// 測試掛鉤（彩排／驗證用）：
+//   __raise.mockPlayers({p1:{table:'B12',name:'小明',clicks:150}, ...})
+//   __raise.mockState('running')
+//   __raise.spawnBills(7)
+window.__raise = {
+  mockPlayers: applyPlayers,
+  mockState(s) { const prev = gameState; gameState = s; renderState(prev); },
+  mockCountdown(seconds) { startCountdown(Date.now() + seconds * 1000); },
+  stopCountdown,
+  spawnBills,
+  get info() { return { gameState, total: totalOf(latestPlayers), bills: $("bills").childElementCount }; },
+};
+</script>
+</body>
+</html>
