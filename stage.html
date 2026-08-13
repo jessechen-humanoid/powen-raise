@@ -49,18 +49,20 @@
   #board li .who { overflow: hidden; text-overflow: ellipsis; }
   #board li .amt { color: var(--yellow); font-variant-numeric: tabular-nums; font-weight: 700; font-size: .62em; }
 
-  /* 主區右：倒數＋金額 */
+  /* 主區右：金額置頂 → 分隔線 → 標籤＋碼錶（結構同 draw.html 的 大字→divider→次行） */
   #center { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-width: 0; z-index: 2; }
-  #countdown {
-    visibility: hidden;
-    font-size: 9vh; font-weight: 900; color: var(--yellow);
-    font-variant-numeric: tabular-nums; line-height: 1.1;
-    margin-bottom: 1vh; text-shadow: 0 2px 10px #000;
+  #divider { width: 52px; height: 2px; margin: 2.6vh 0; background: rgba(255,209,102,.45); border-radius: 2px; }
+  #subRow {
+    display: flex; align-items: center; justify-content: center; gap: 22px; flex-wrap: wrap;
+    font-size: 3.6vh; color: var(--yellow); font-weight: 700; white-space: nowrap;
   }
-  #countdown.on { visibility: visible; }
-  #countdown.urgent { color: #ff6b6b; animation: pulse .5s infinite alternate; }
+  #pill-timer {
+    font-size: .85em; font-weight: 700; color: rgba(255,250,235,.75);
+    border: 1px solid rgba(255,250,235,.28); border-radius: 999px;
+    padding: .45em 1em; font-variant-numeric: tabular-nums; letter-spacing: .06em;
+  }
+  #pill-timer.urgent { color: #ff6b6b; border-color: #ff6b6b; animation: pulse .5s infinite alternate; }
   @keyframes pulse { to { transform: scale(1.12); } }
-  #amount-label { font-size: 4.2vh; color: rgba(255,253,246,.6); letter-spacing: .5vh; }
   #amount {
     font-size: min(8.5vw, 18vh); font-weight: 900; color: var(--ink);
     line-height: 1.15; white-space: nowrap;
@@ -87,8 +89,9 @@
     to { transform: translateY(120vh) rotate(14deg); }
   }
 
-  /* ===== 柏文小人（A 蛋形）：主區底部左右來回跑，純裝飾 ===== */
-  #powen-track { position: absolute; left: 0; right: var(--side); bottom: 1vh; height: 30vh; z-index: 3; pointer-events: none; }
+  /* ===== 柏文小人（A 蛋形）：畫面垂直中段左右來回跑（後排看得到），
+         水平只跨「排行榜右緣 ↔ 側欄左緣」，不遮排行榜 ===== */
+  #powen-track { position: absolute; left: 28vw; right: calc(var(--side) + 1vw); top: 34vh; height: 30vh; z-index: 3; pointer-events: none; }
   #runner { position: absolute; bottom: 0; left: 0;
     animation: run 7s ease-in-out infinite alternate; animation-play-state: paused; }
   #runner .flip { animation: flip 14s step-end infinite; animation-play-state: paused; }
@@ -106,7 +109,7 @@
   body.running #runner .legL, body.running #runner .legR { animation-play-state: running; }
   /* 凍結：停在原地、微微上抬定格慶祝 */
   body.frozen #runner .powen { transform: translateY(-1.5vh); }
-  @keyframes run { from { transform: translateX(2vw); } to { transform: translateX(calc(76vw - 16vh)); } }
+  @keyframes run { from { transform: translateX(0); } to { transform: translateX(calc(47vw - 14vh)); } }
   @keyframes flip { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
   @keyframes bob { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-1.2vh) rotate(2deg); } }
   @keyframes kickL { from { transform: rotate(-24deg); } to { transform: rotate(20deg); } }
@@ -165,9 +168,12 @@
       <ol id="board"></ol>
     </section>
     <section id="center">
-      <div id="countdown">90</div>
-      <div id="amount-label">柏文目前已加薪</div>
       <div id="amount"></div>
+      <div id="divider"></div>
+      <div id="subRow">
+        <span>柏文累積加薪金額</span>
+        <span id="pill-timer">01:30</span>
+      </div>
       <div id="frozen-tag">— 薪水已凍結 —</div>
     </section>
   </main>
@@ -257,6 +263,7 @@ $("sec-input").value = parseInt(localStorage.getItem(SEC_KEY), 10) || DEFAULT_SE
 $("sec-input").addEventListener("change", () => {
   const v = parseInt($("sec-input").value, 10);
   if (v > 0) localStorage.setItem(SEC_KEY, v); // running 中改值不影響當前回合，下次開始才生效
+  if (gameState === "idle") previewClock(); // idle 時碼錶即時反映新設定
 });
 
 // ===== 狀態 =====
@@ -371,25 +378,33 @@ function spawnBills(count) {
   }
 }
 
-// ===== 倒數計時（投影端是唯一權威） =====
+// ===== 倒數碼錶（MM:SS，投影端是唯一權威） =====
+const fmtClock = (sec) => {
+  const s = Math.max(0, sec);
+  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+};
+// idle 時碼錶預覽本回合設定秒數（90 → 01:30）
+function previewClock() {
+  $("pill-timer").textContent = fmtClock(parseInt($("sec-input").value, 10) || DEFAULT_SECONDS);
+  $("pill-timer").classList.remove("urgent");
+}
 let tickTimer = null;
 function startCountdown(endsAt) {
   localStorage.setItem(ENDS_KEY, endsAt);
   clearInterval(tickTimer);
-  $("countdown").classList.add("on");
   const tick = () => {
     const remain = Math.ceil((endsAt - Date.now()) / 1000);
-    if (remain <= 0) { stopCountdown(); doFreeze(); return; }
-    $("countdown").textContent = remain;
-    $("countdown").classList.toggle("urgent", remain <= 10);
+    if (remain <= 0) { $("pill-timer").textContent = fmtClock(0); stopCountdown(); doFreeze(); return; }
+    $("pill-timer").textContent = fmtClock(remain);
+    $("pill-timer").classList.toggle("urgent", remain <= 10);
   };
   tick();
   tickTimer = setInterval(tick, 200);
 }
-// 只停 UI 與計時器，「不」清 endsAt——running 中重新整理要靠它續跑
+// 只停計時器，碼錶維持最後顯示值（frozen 定格）；「不」清 endsAt——running 中重新整理要靠它續跑
 function stopCountdown() {
   clearInterval(tickTimer); tickTimer = null;
-  $("countdown").classList.remove("on", "urgent");
+  $("pill-timer").classList.remove("urgent");
 }
 
 // ===== 遊戲控制 =====
@@ -484,7 +499,7 @@ function renderState(prev) {
   if (gameState !== "running") stopCountdown();
   // 看到 idle 就作廢上一回合的續跑時間——否則第二台備援投影頁若殘留過期
   // endsAt，會在別台按 S 的瞬間誤判「回合已結束」而立刻凍結全場。
-  if (gameState === "idle") localStorage.removeItem(ENDS_KEY);
+  if (gameState === "idle") { localStorage.removeItem(ENDS_KEY); previewClock(); }
   if (gameState === "running" && !tickTimer) {
     // 頁面在 running 中重新整理：從 localStorage 續跑倒數
     const endsAt = parseInt(localStorage.getItem(ENDS_KEY), 10);
