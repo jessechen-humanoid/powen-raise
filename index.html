@@ -252,8 +252,13 @@ async function flush() {
       body: JSON.stringify({ clicks: { ".sv": { increment: n } } }),
       keepalive: true, // 頁面切背景時也把這筆送完
     });
-    // 4xx＝被規則拒絕（例如剛好凍結），直接放掉；只有網路層失敗才還原補傳
-    if (!res.ok && res.status >= 500) pending += n;
+    // 5xx／斷網＝網路層失敗，還原補傳；4xx＝被規則拒絕（剛好凍結，或「回歸現實→
+    // 立刻開始」快到讓輪詢沒看到 idle、節點沒重建）——後者靠 ensurePlayerNode 自癒：
+    // 節點不在就重建（本地歸零，與伺服器一致），下一輪 flush 就能正常上傳。
+    if (!res.ok) {
+      if (res.status >= 500) pending += n;
+      else ensurePlayerNode();
+    }
   } catch (_) {
     pending += n; // 斷網：還原待傳數，恢復後下一輪 flush 補傳（仍受單次封頂）
   } finally {
