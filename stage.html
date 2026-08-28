@@ -112,7 +112,23 @@
   #runner .legL { transform-origin: 84px 178px; animation: kickL .32s ease-in-out infinite alternate; animation-play-state: paused; }
   #runner .legR { transform-origin: 116px 178px; animation: kickR .32s ease-in-out infinite alternate; animation-play-state: paused; }
   body.running #runner, body.running #runner .flip, body.running #runner .powen,
-  body.running #runner .legL, body.running #runner .legR { animation-play-state: running; }
+  body.running #runner .legL, body.running #runner .legR,
+  body.running #runner .bubble { animation-play-state: running; }
+  /* 台詞氣泡：錨在頭頂上方隨小人移動；跟 .flip 同參數再翻一次抵銷鏡射
+     （兩支動畫都由 body.running 一起暫停/恢復，進度永遠同步）。
+     顯示切換用 opacity 不用 display——display:none 會重啟動畫，鏡射就失步了。
+     max-width 24vh：最長台詞折兩行，兩端極限位置不會壓到排行榜/側欄 */
+  .powen .bubble { position: absolute; bottom: calc(100% + 1vh); left: 50%; z-index: 3;
+    width: max-content; max-width: 24vh; padding: .8vh 1.4vh; border-radius: 1.6vh;
+    background: var(--ink); color: #0a0a0a; font-size: 2.4vh; font-weight: 800;
+    line-height: 1.3; text-align: center; text-shadow: none;
+    opacity: 0; transition: opacity .25s ease;
+    transform: translateX(-50%);
+    animation: bubbleFlip 14s step-end infinite; animation-play-state: paused; }
+  .powen .bubble.show { opacity: 1; }
+  .powen .bubble::after { content: ""; position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%); border: 1vh solid transparent; border-top-color: var(--ink); border-bottom: 0; }
+  @keyframes bubbleFlip { 0%, 100% { transform: translateX(-50%) scaleX(1); } 50% { transform: translateX(-50%) scaleX(-1); } }
   /* 凍結：停在原地、微微上抬定格慶祝 */
   body.frozen #runner .powen { transform: translateY(-1.5vh); }
   @keyframes run { from { transform: translateX(0); } to { transform: translateX(calc(47vw - 21vh)); } }
@@ -187,6 +203,7 @@
   <div id="powen-track">
     <div id="runner"><div class="flip">
       <div class="powen">
+        <div class="bubble" id="powen-bubble"></div>
         <img class="head" src="powen-head.png" alt="柏文"
              onerror="this.style.display='none'; this.closest('.powen').querySelector('.head-fallback').style.display='block'">
         <svg class="head-fallback" viewBox="0 0 100 100" style="width:44%;margin:0 auto -30%;position:relative;z-index:2;">
@@ -392,6 +409,7 @@ function applyPlayers(players) {
   shownTotal = total;
   renderAmount(total);
   renderBoard(latestPlayers);
+  updateBubble(); // 玩家池空↔非空會影響氣泡顯示；不換台詞
 }
 
 // ===== 千元鈔飄落：深淺黃色系（QQQQAAAA token），同屏上限 40，超出略過 =====
@@ -551,6 +569,7 @@ function renderState(prev) {
     if (endsAt > Date.now()) startCountdown(endsAt);
     else if (endsAt) { stopCountdown(); doFreeze(); }
   }
+  updateBubble(); // 狀態切換立即反映氣泡顯示規則（frozen/idle 即刻隱藏，不等輪播 tick）
 }
 
 // ===== 左下狀態列（同 screen.html 的 #stat）=====
@@ -558,6 +577,39 @@ setInterval(() => {
   const n = Object.values(latestPlayers || {}).filter((p) => p && p.name).length;
   $("stat").textContent = `狀態 ${gameState} · 貴人 ${n} · 鈔票 ${$("bills").childElementCount}` + (db ? "" : " · 未連線");
 }, 500);
+
+// ===== 柏文台詞氣泡：輪播跪舔台詞（純裝飾，不影響計分與金額） =====
+// 10 句定稿模板（2026/08/28 Jesse 確認，逐字使用），{暱稱} 代入玩家 name
+const BUBBLE_TEMPLATES = [
+  "{暱稱}是我的再生父母！",
+  "{暱稱}你是天使嗎？",
+  "沒有{暱稱}就沒有柏文！",
+  "{暱稱}我下輩子做牛做馬還你！",
+  "{暱稱}大恩大德沒齒難忘！",
+  "我要把{暱稱}供起來拜！",
+  "{暱稱}收我當乾兒子好嗎？",
+  "{暱稱}救了我全家！",
+  "遇見{暱稱}是我最幸運的事！",
+  "{暱稱}！加薪之神就是你！",
+];
+const BUBBLE_INTERVAL_MS = 4000;
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+let bubbleForcedText = null; // __raise.say() 測試掛鉤用：非 null 時鎖定顯示該文字
+// 顯示規則：running 且玩家池 ≥1 人才顯示；台詞只在輪播 tick 或「隱藏→顯示」時換，
+// 其餘呼叫（每次點擊的 applyPlayers、狀態切換的 renderState）只同步顯示與否
+function updateBubble(rotate = false) {
+  const bubble = $("powen-bubble");
+  if (bubbleForcedText !== null) { bubble.textContent = bubbleForcedText; bubble.classList.add("show"); return; }
+  const pool = Object.values(latestPlayers || {}).filter((p) => p && p.name);
+  const visible = gameState === "running" && pool.length > 0;
+  const wasVisible = bubble.classList.contains("show");
+  bubble.classList.toggle("show", visible);
+  if (visible && (rotate || !wasVisible)) {
+    // replace 用函式回傳，避免暱稱含 $& 等替換樣式被展開；textContent 天然防注入
+    bubble.textContent = pickRandom(BUBBLE_TEMPLATES).replace("{暱稱}", () => pickRandom(pool).name);
+  }
+}
+setInterval(() => updateBubble(true), BUBBLE_INTERVAL_MS);
 
 // ===== Firebase 初始化與訂閱（投影端是唯一持有常駐連線的頁面） =====
 async function initFirebase() {
@@ -585,9 +637,11 @@ initFirebase().catch(() => { $("error-banner").style.display = "flex"; });
 //   __raise.mockPlayers({p1:{table:'B12',name:'小明',clicks:150}, ...})
 //   __raise.mockState('running')
 //   __raise.spawnBills(7)
+//   __raise.say('測試台詞') 強制氣泡顯示該文字（驗位置/鏡射用）；__raise.say() 解除
 window.__raise = {
   mockPlayers: applyPlayers,
   mockState(s) { const prev = gameState; gameState = s; renderState(prev); },
+  say(text) { bubbleForcedText = text ?? null; updateBubble(); },
   mockCountdown(seconds) { startCountdown(Date.now() + seconds * 1000); },
   stopCountdown,
   spawnBills,
