@@ -494,7 +494,13 @@ function doReset() {
   disarmReset();
   stopCountdown();
   localStorage.removeItem(ENDS_KEY); // 歸零＝全新一場，清掉續跑用的結束時間
-  if (db) fb.update(fb.ref(db, "raise"), { state: "idle", players: null, finalTotal: null }).catch(() => {});
+  // 兩段式歸零：rules 只允許在 state 為 idle 時清空 players（root 反映寫入前資料），
+  // 所以必須先把 state 寫成 idle、成功後才清 players；第一段失敗就不清，避免半歸零
+  if (db) {
+    fb.set(fb.ref(db, "raise/state"), "idle")
+      .then(() => fb.update(fb.ref(db, "raise"), { players: null, finalTotal: null }))
+      .catch(() => {});
+  }
 }
 function disarmReset() {
   clearTimeout(resetArmed); resetArmed = null;

@@ -332,6 +332,7 @@ function applyState(next) {
   gameState = next;
   if (next === "frozen" && prev !== "frozen") { flushOnFreeze(); fetchFinalTotal(); }
   if (next === "idle" && prev !== "idle" && player) ensurePlayerNode(); // 回歸現實後重建節點
+  if (next === "running" && prev !== "running" && player) ensurePlayerNode(); // 節點若在 idle 期間被清掉（含兩段式歸零的空窗），開始時補建
   renderState();
 }
 async function fetchFinalTotal() {
