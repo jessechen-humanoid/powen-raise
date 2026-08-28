@@ -59,6 +59,11 @@
 
   /* ===== 遊戲畫面 ===== */
   #player-tag { color: rgba(255,253,246,.55); font-size: 14px; margin-top: 4px; }
+  /* 改資訊入口：小字連結；frozen 是定格 punchline，凍結時藏起來不給改 */
+  #edit-info { background: none; border: none; font-family: inherit;
+    color: rgba(255,253,246,.55); font-size: 14px; text-decoration: underline;
+    margin-top: 6px; padding: 4px 8px; }
+  body.frozen #edit-info { display: none; }
   #status-line { font-size: 16px; color: rgba(255,253,246,.6); min-height: 24px; text-align: center; margin-top: 14px; }
   #my-amount {
     font-size: 42px; font-weight: 800; color: var(--yellow);
@@ -108,6 +113,7 @@
 <section id="game" class="screen">
   <h1>幫柏文加薪！</h1>
   <div id="player-tag"></div>
+  <button id="edit-info" type="button">改暱稱／換桌</button>
   <div id="status-line"></div>
   <div id="my-amount">$0</div>
   <div id="my-amount-label">你幫柏文加的薪水</div>
@@ -168,10 +174,43 @@ $("nickname").addEventListener("input", validateForm);
 $("join-btn").addEventListener("click", () => {
   const err = nicknameError($("nickname").value);
   if (err || !selectedTable) { $("form-hint").textContent = err || "請先選桌次"; return; }
-  player = { id: newId(), table: selectedTable, name: $("nickname").value.trim() };
+  const isUpdate = editing && player;
+  player = {
+    id: isUpdate ? player.id : newId(), // 更新模式保留同一 id，排行榜才不會多出殭屍列
+    table: selectedTable,
+    name: $("nickname").value.trim(),
+  };
   localStorage.setItem(STORE_KEY, JSON.stringify(player));
+  editing = false;
+  if (isUpdate) updatePlayerInfo();
   enterGame();
 });
+
+// ---- 改暱稱／換桌：回入場畫面預填現值，送出改走更新模式 ----
+let editing = false;
+$("edit-info").addEventListener("click", () => {
+  if (!player) return;
+  editing = true;
+  $("table-select").value = player.table;
+  selectedTable = player.table;
+  $("nickname").value = player.name;
+  $("join-btn").textContent = "更新資料";
+  validateForm();
+  showScreen("onboarding");
+});
+
+// 既有節點只 PATCH table/name 兩欄（clicks 不動）。節點被「回歸現實」清掉時，
+// 這筆 PATCH 會被規則拒絕（合併後沒有 clicks）——沒關係，enterGame 的
+// ensurePlayerNode 會用新資訊整包重建（clicks 0），兩條路都收斂到正確狀態。
+async function updatePlayerInfo() {
+  if (!REST_BASE || !player) return;
+  try {
+    await fetch(playerUrl(), {
+      method: "PATCH",
+      body: JSON.stringify({ table: player.table, name: player.name }),
+    });
+  } catch (_) { /* 離線：localStorage 已更新，恢復後以本地顯示為準 */ }
+}
 
 // ---- 畫面切換 ----
 function showScreen(id) {
