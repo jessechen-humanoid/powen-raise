@@ -1,0 +1,205 @@
+/* Presentation only. Existing operator controls and game data are untouched. */
+:root {
+  --bg: #0a0b0a;
+  --ink: #fff9ec;
+  --yellow: #edce82;
+  --stage-rule: rgba(237, 206, 130, .19);
+}
+
+#screenArea {
+  background:
+    radial-gradient(ellipse at 54% 81%, rgba(155, 116, 39, .1), transparent 38%),
+    linear-gradient(145deg, #0e100e 0%, #090a09 55%, #11120e 100%);
+}
+
+/* The fixed ground line gives the performer a visible place to land. */
+#screenArea::before {
+  content: "";
+  position: absolute;
+  left: 30vw;
+  right: calc(var(--side) + 2vw);
+  bottom: 14vh;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(237, 206, 130, .4) 22%, rgba(237, 206, 130, .4) 78%, transparent);
+  pointer-events: none;
+}
+
+#main {
+  gap: 2.5vw;
+  padding: 5.8vh 2vw 0 3vw;
+}
+
+#boardWrap {
+  align-items: stretch;
+  padding-top: .2vh;
+}
+
+#board-title {
+  padding: 0 .4vw 2vh;
+  margin-bottom: 1.15vh;
+  border-bottom: 1px solid var(--stage-rule);
+  font-size: min(2.9vh, 1.85vw);
+  line-height: 1.35;
+  letter-spacing: .12em;
+  text-shadow: none;
+}
+
+#board li {
+  grid-template-columns: 2ch minmax(0, 1fr) auto;
+  gap: .65vw;
+  min-height: 5.85vh;
+  padding: .95vh .4vw;
+  border-bottom: 1px solid rgba(255, 249, 236, .055);
+  font-size: min(2.45vh, 1.58vw);
+  font-weight: 600;
+  line-height: 1.5;
+  text-shadow: none;
+}
+
+#board li .rank {
+  color: rgba(255, 249, 236, .35);
+  font-size: .78em;
+  text-align: left;
+}
+
+#board li .amt {
+  font-size: .9em;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+
+#board li:first-child {
+  color: var(--yellow);
+  background: linear-gradient(90deg, rgba(237, 206, 130, .07), rgba(237, 206, 130, 0));
+}
+
+#board li:first-child .rank {
+  color: var(--yellow);
+}
+
+#center {
+  position: relative;
+}
+
+#subRow {
+  gap: 1.15vw;
+  width: 100%;
+  margin-bottom: 1.2vh;
+  font-size: min(2.9vh, 1.85vw);
+  line-height: 1.35;
+  letter-spacing: .1em;
+  text-shadow: none;
+}
+
+#pill-timer {
+  align-items: center;
+  align-self: center;
+  min-height: 1.65em;
+  padding: .05em .6em;
+  color: var(--ink);
+  border-color: rgba(237, 206, 130, .28);
+  border-radius: .25em;
+  background: rgba(237, 206, 130, .045);
+  letter-spacing: .035em;
+}
+
+#amount {
+  max-width: 100%;
+  color: var(--ink);
+  font-size: min(7.8vw, 14.5vh);
+  font-weight: 900;
+  letter-spacing: -.045em;
+  text-shadow: 0 3px 0 rgba(237, 206, 130, .08);
+}
+
+#amount .odo {
+  letter-spacing: -.045em;
+}
+
+/* Clipping keeps all paper out of the amount, ranking and QR columns. */
+#bills {
+  left: 29vw;
+  right: calc(var(--side) + 2vw);
+  top: 33vh;
+  bottom: 12vh;
+  contain: layout paint;
+}
+
+.bill {
+  top: -12vh;
+  opacity: 0;
+  height: auto;
+  animation-name: stage-paper-fall;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  transform-origin: 50% 50%;
+}
+
+@keyframes stage-paper-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(var(--bill-tilt, -16deg));
+  }
+  10% { opacity: .64; }
+  35% {
+    transform: translate3d(calc(var(--bill-drift, 2vw) * .75), 24vh, 0) rotate(calc(var(--bill-tilt, -16deg) + 22deg));
+  }
+  65% {
+    opacity: .64;
+    transform: translate3d(calc(var(--bill-drift, 2vw) * -.3), 45vh, 0) rotate(calc(var(--bill-tilt, -16deg) - 12deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--bill-drift, 2vw), 76vh, 0) rotate(calc(var(--bill-tilt, -16deg) + 30deg));
+  }
+}
+
+#sidebar {
+  padding: 6.1vh 1.5vw 4vh;
+  gap: 3.4vh;
+  border-left: 1px solid var(--stage-rule);
+  background: linear-gradient(180deg, #131510 0%, #0c0e0b 70%);
+}
+
+#qrBox {
+  width: min(17.2vw, 31vh);
+  border: .55vh solid #fff;
+  border-radius: 1.6vh;
+  box-shadow: 0 1.4vh 3vh rgba(0, 0, 0, .26);
+}
+
+#ctaTitle {
+  font-size: min(3.5vh, 2.2vw);
+  line-height: 1.55;
+  letter-spacing: .055em;
+  text-shadow: none;
+}
+
+#counterWrap {
+  width: 74%;
+  margin-top: .5vh;
+  padding-top: 3vh;
+  border-top: 1px solid var(--stage-rule);
+}
+
+.counterLine {
+  color: rgba(255, 249, 236, .67);
+  font-size: 2.15vh;
+  font-weight: 600;
+  letter-spacing: .1em;
+}
+
+#guestCount {
+  margin: .4vh 0 .7vh;
+  color: var(--ink);
+  font-size: 7.6vh;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bill { animation-duration: 1ms !important; }
+  #amount .strip { transition-duration: 0s; }
+  #pill-timer.urgent { animation: none; }
+}

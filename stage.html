@@ -95,47 +95,25 @@
     to { transform: translateY(120vh) rotate(14deg); }
   }
 
-  /* ===== 柏文小人（A 蛋形）：畫面垂直中段左右來回跑（後排看得到），
-         水平只跨「排行榜右緣 ↔ 側欄左緣」，不遮排行榜 ===== */
-  #powen-track { position: absolute; left: 28vw; right: calc(var(--side) + 1vw); top: 38vh; height: 30vh; z-index: 3; pointer-events: none; }
-  #runner { position: absolute; bottom: 0; left: 0;
-    animation: run 7s ease-in-out infinite alternate; animation-play-state: paused; }
-  #runner .flip { animation: flip 14s step-end infinite; animation-play-state: paused; }
+  /* 舊 SVG 在初始化前作為靜態 fallback；角色動畫由共用時間軸接管。 */
+  #powen-track { position: absolute; left: 30vw; right: calc(var(--side) + 2vw); top: 33vh; bottom: 14vh; z-index: 3; pointer-events: none; }
+  #runner { position: absolute; bottom: 0; left: 0; }
   .powen { position: relative; width: 20vh; }
-  /* 頭壓進軀幹頂（深疊 46%），看起來才像長在身上而不是飄著 */
   .powen .head { display: block; width: 56%; margin: 0 auto -46%; position: relative; z-index: 2; }
   .powen .head-fallback { display: none; }
   .powen .body { display: block; width: 100%; }
-  /* 身體膚色（取自照片膚調） */
   .powen .limb { fill: none; stroke: #E8B88C; stroke-width: 19; stroke-linecap: round; }
-  #runner .powen { animation: bob .32s ease-in-out infinite alternate; animation-play-state: paused; }
-  #runner .legL { transform-origin: 84px 178px; animation: kickL .32s ease-in-out infinite alternate; animation-play-state: paused; }
-  #runner .legR { transform-origin: 116px 178px; animation: kickR .32s ease-in-out infinite alternate; animation-play-state: paused; }
-  body.running #runner, body.running #runner .flip, body.running #runner .powen,
-  body.running #runner .legL, body.running #runner .legR,
-  body.running #runner .bubble { animation-play-state: running; }
-  /* 台詞氣泡：錨在頭頂上方隨小人移動；跟 .flip 同參數再翻一次抵銷鏡射
-     （兩支動畫都由 body.running 一起暫停/恢復，進度永遠同步）。
-     顯示切換用 opacity 不用 display——display:none 會重啟動畫，鏡射就失步了。
-     max-width 24vh：最長台詞折兩行，兩端極限位置不會壓到排行榜/側欄 */
-  .powen .bubble { position: absolute; bottom: calc(100% + 1vh); left: 50%; z-index: 3;
-    width: max-content; max-width: 24vh; padding: .8vh 1.4vh; border-radius: 1.6vh;
-    background: var(--ink); color: #0a0a0a; font-size: 2.4vh; font-weight: 800;
-    line-height: 1.3; text-align: center; text-shadow: none;
-    opacity: 0; transition: opacity .25s ease;
-    transform: translateX(-50%);
-    animation: bubbleFlip 14s step-end infinite; animation-play-state: paused; }
-  .powen .bubble.show { opacity: 1; }
-  .powen .bubble::after { content: ""; position: absolute; top: 100%; left: 50%;
-    transform: translateX(-50%); border: 1vh solid transparent; border-top-color: var(--ink); border-bottom: 0; }
-  @keyframes bubbleFlip { 0%, 100% { transform: translateX(-50%) scaleX(1); } 50% { transform: translateX(-50%) scaleX(-1); } }
-  /* 凍結：停在原地、微微上抬定格慶祝 */
-  body.frozen #runner .powen { transform: translateY(-1.5vh); }
-  @keyframes run { from { transform: translateX(0); } to { transform: translateX(calc(47vw - 21vh)); } }
-  @keyframes flip { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(-1); } }
-  @keyframes bob { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-1.2vh) rotate(2deg); } }
-  @keyframes kickL { from { transform: rotate(-24deg); } to { transform: rotate(20deg); } }
-  @keyframes kickR { from { transform: rotate(20deg); } to { transform: rotate(-24deg); } }
+  #runner.performer { width: 300px; height: 360px; transform-origin: 0 100%; will-change: transform; }
+  .performer > svg { display: block; overflow: visible; }
+  .performer .bubble { position: absolute; top: 0; left: 0; z-index: 3;
+    width: max-content; max-width: 290px; padding: 11px 17px 12px;
+    border-radius: 20px 20px 20px 7px; border: 1px solid #e6ddc9;
+    background: var(--ink); color: #19150f; font-size: 24px; font-weight: 800;
+    line-height: 1.32; text-align: center; text-shadow: none; overflow-wrap: anywhere;
+    opacity: 0; transition: opacity .25s ease; box-shadow: 0 3px 0 #a9915b; }
+  .performer .bubble.show { opacity: 1; }
+  .performer .bubble::after { content: ""; position: absolute; top: calc(100% - 1px); left: 50%;
+    width: 15px; height: 15px; background: var(--ink); clip-path: polygon(0 0,100% 0,0 100%); }
 
   /* ===== 右側欄（與 screen.html 相同結構）===== */
   #sidebar { position: absolute; top: 0; right: 0; bottom: 0; width: var(--side); z-index: 10;
@@ -178,6 +156,7 @@
   #btn-reset.confirming { background: #1a0d0d; color: #ff7b78; border-color: #ff6b6b !important; }
   #panel .keys { font-size: 11px; color: #666; margin-top: 14px; line-height: 1.6; }
 </style>
+<link rel="stylesheet" href="./stage-art.css">
 </head>
 <body>
 <div id="screenArea">
@@ -273,9 +252,11 @@
 
 <script type="module">
 import { firebaseConfig, isPlaceholder } from "./firebase-config.js";
+import { createPerformer } from "./powen-performer.js";
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => "$" + n.toLocaleString("en-US");
+const performer = createPerformer($("powen-track"));
 
 // ===== 現場可調參數（localStorage，重新整理不用重設） =====
 const SEC_KEY = "raise.countdownSeconds";
@@ -413,15 +394,6 @@ function applyPlayers(players) {
 }
 
 // ===== 千元鈔飄落：深淺黃色系（QQQQAAAA token），同屏上限 40，超出略過 =====
-const BILL_SVG = encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="180" height="80" viewBox="0 0 180 80">
-    <rect width="180" height="80" rx="8" fill="#FFD166"/>
-    <rect x="6" y="6" width="168" height="68" rx="5" fill="none" stroke="#B9873B" stroke-width="2"/>
-    <circle cx="45" cy="40" r="22" fill="#FFE9B8"/>
-    <text x="112" y="48" font-family="sans-serif" font-size="26" font-weight="bold" fill="#1a1200" text-anchor="middle">1000</text>
-    <text x="45" y="46" font-family="serif" font-size="18" fill="#1a1200" text-anchor="middle">仟</text>
-  </svg>`
-);
 const MAX_BILLS = 40;
 function spawnBills(count) {
   const room = MAX_BILLS - $("bills").childElementCount;
@@ -429,9 +401,12 @@ function spawnBills(count) {
   for (let i = 0; i < n; i++) {
     const img = document.createElement("img");
     img.className = "bill";
-    img.src = `data:image/svg+xml,${BILL_SVG}`;
+    img.src = "./stage-bill.svg";
+    img.alt = "";
     img.style.left = Math.random() * 88 + "%";
-    img.style.width = 6 + Math.random() * 4 + "vw"; // 6–10vw，遠看也認得出是千元鈔
+    img.style.width = 4 + Math.random() * 2 + "vw";
+    img.style.setProperty("--bill-drift", (Math.random() * 6 - 3) + "vw");
+    img.style.setProperty("--bill-tilt", (Math.random() * 44 - 22) + "deg");
     img.style.animationDuration = 3.5 + Math.random() * 3 + "s";
     img.style.animationDelay = Math.random() * 0.5 + "s"; // 同批錯開，不要整排齊落
     img.addEventListener("animationend", () => img.remove());
@@ -561,6 +536,7 @@ document.addEventListener("keydown", (e) => {
 
 // ===== 狀態反映到畫面 =====
 function renderState(prev) {
+  performer.setState(gameState);
   document.body.classList.toggle("frozen", gameState === "frozen");
   document.body.classList.toggle("running", gameState === "running");
   $("btn-start").disabled = gameState !== "idle";
@@ -645,6 +621,7 @@ initFirebase().catch(() => { $("error-banner").style.display = "flex"; });
 //   __raise.spawnBills(7)
 //   __raise.say('測試台詞') 強制氣泡顯示該文字（驗位置/鏡射用）；__raise.say() 解除
 window.__raise = {
+  performer,
   mockPlayers: applyPlayers,
   mockState(s) { const prev = gameState; gameState = s; renderState(prev); },
   say(text) { bubbleForcedText = text ?? null; updateBubble(); },

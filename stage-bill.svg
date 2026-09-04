@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 140" fill="none">
+  <title>一千元紙鈔</title>
+  <path d="M15 31C62 10 111 14 153 29C177 37 199 33 223 21L224 108C194 119 169 123 142 113C98 98 59 100 18 117L15 31Z" fill="#56461F" stroke="#F2D47F" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M26 39C68 23 109 25 150 39C173 47 194 45 212 38L213 99C187 109 168 111 145 103C100 88 64 90 29 103L26 39Z" stroke="#D6B763" stroke-width="2"/>
+  <path d="M38 40C63 31 80 29 96 30M159 104C175 109 191 107 203 103" stroke="#F2D47F" stroke-width="2" stroke-linecap="round"/>
+  <path d="M56 31C69 27 86 26 104 28L106 94C89 92 73 92 58 95L56 31Z" fill="#DAB868" opacity=".1"/>
+  <path d="M153 40C173 47 190 45 204 41L205 95C187 102 172 104 155 99L153 40Z" fill="#1E2116" opacity=".2"/>
+  <ellipse cx="119" cy="69" rx="57" ry="31" stroke="#D6B763" stroke-width="1.5" opacity=".7" transform="rotate(4 119 69)"/>
+  <path d="M35 51L43 43L51 51L43 59L35 51ZM185 94L193 86L201 94L193 102L185 94Z" fill="#F2D47F"/>
+  <text x="119" y="85" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="51" font-weight="700" letter-spacing="-3" fill="#FFF0B9" transform="rotate(4 119 69)">1000</text>
+  <path d="M19 117C60 102 98 98 142 113C169 123 194 119 224 108" stroke="#B89745" stroke-width="2" stroke-linecap="round"/>
+</svg>
