@@ -9,9 +9,13 @@ export function createMotion({ random = Math.random } = {}) {
   let x = 0, direction = 1, phase = 0, time = 0, speed = 0;
   let initialized = false, lastSpecial = '', specialIn = 2.5;
   let settlingFrom = null, eventFrom = null, settled = false, turns = 0;
+  let turnFrom = 1, turnStart = 0, turnRadius = 0, settlingFacing = 1;
   const events = { run: 0, hop: 0, stumble: 0, turn: 0 };
   const roll = () => clamp(Number(random()) || 0, 0, .999999);
-  const snapshot = () => ({ state, event, eventTime, eventDuration, x, direction,
+  const facing = () => event === 'turn'
+    ? turnFrom * Math.cos(Math.PI * clamp(eventTime / eventDuration, 0, 1))
+    : event === 'settle' ? mix(settlingFacing, direction, smooth(eventTime / eventDuration)) : direction;
+  const snapshot = () => ({ state, event, eventTime, eventDuration, x, direction, facing: facing(),
     phase, speed, time, settled, turns, events: { ...events }, settlingFrom, eventFrom });
   function begin(name, duration) {
     eventFrom = samplePose(snapshot());
@@ -22,6 +26,7 @@ export function createMotion({ random = Math.random } = {}) {
     setState(next) {
       if (!['idle', 'running', 'frozen'].includes(next) || next === state) return;
       settlingFrom = samplePose(snapshot());
+      settlingFacing = facing();
       state = next; settled = false;
       if (next === 'running') {
         begin('run', 1.8 + roll() * 1.6); specialIn = eventDuration;
@@ -32,6 +37,10 @@ export function createMotion({ random = Math.random } = {}) {
       width = Math.max(0, Number(width) || 0);
       if (!initialized) { x = width * .42; initialized = true; }
       x = clamp(x, 0, width);
+      // Resize must also clamp the saved arc, otherwise expanding the track
+      // after shrinking it can revive an off-screen pre-resize origin.
+      turnStart = clamp(turnStart, 0, width);
+      turnRadius = Math.min(turnRadius, turnFrom > 0 ? width - turnStart : turnStart);
       if (settled && state === 'frozen') return snapshot();
       time += dt; eventTime += dt;
       if (state !== 'running') {
@@ -45,18 +54,21 @@ export function createMotion({ random = Math.random } = {}) {
       let targetSpeed = 124;
       if (event === 'hop') targetSpeed = 91;
       if (event === 'stumble') targetSpeed = 124 * (1 - .65 * Math.sin(p * Math.PI));
-      if (event === 'turn') targetSpeed = 0;
       const edge = direction > 0 ? width - x : x;
-      targetSpeed *= smooth(edge / 100);
       speed = mix(speed, targetSpeed, Math.min(1, dt * 9));
-      x = clamp(x + direction * speed * dt, 0, width);
-      // A planted foot moves backward by the same distance the body travels.
+      // A short semicircle reverses horizontal velocity without a stationary
+      // braking segment. Stride keeps its rhythm through the curved travel.
+      x = event === 'turn'
+        ? clamp(turnStart + turnFrom * turnRadius * Math.sin(Math.PI * p), 0, width)
+        : clamp(x + direction * speed * dt, 0, width);
       phase += speed * dt / 152 * TAU;
       if (event === 'turn') {
-        if (p >= .5 && direction === this.turnFrom) { direction *= -1; turns++; }
+        if (p >= .5 && direction === turnFrom) { direction *= -1; turns++; }
         if (p >= 1) { begin('run', 1.4 + roll()); specialIn = eventDuration; }
-      } else if (event === 'run' && edge < 9) {
-        this.turnFrom = direction; speed = 0; begin('turn', .52);
+      } else if (event === 'run' && edge < 28) {
+        turnFrom = direction; turnStart = x;
+        turnRadius = Math.min(speed * .42 / Math.PI, direction > 0 ? width - x : x);
+        begin('turn', .42);
       } else if (event !== 'run' && p >= 1) {
         begin('run', 1.6 + roll() * 2.1); specialIn = eventDuration;
       } else if (event === 'run') {
@@ -98,11 +110,8 @@ export function samplePose(s) {
     armLift = 22 * lurch; spread = 29 * lurch;
     impact = Math.max(0, Math.sin(p * Math.PI * 3)) * .6;
   } else if (s.event === 'turn') {
-    // Pass through an upright pose when facing flips at the midpoint.
-    lean = -12 * Math.sin(p * TAU);
-    hip.y += 9 * Math.sin(p * Math.PI);
-    left = { x: 123, y: 330, angle: 0 }; right = { x: 177, y: 330, angle: 0 };
-    spread = 8; gait && (armLift = 4);
+    // Keep the running feet and arms; a small rise follows the turn arc.
+    hip.y -= 5 * Math.sin(p * Math.PI);
   }
   if (!running) {
     const breathing = s.state === 'idle' ? Math.sin(s.time * 1.8) : 0;
@@ -227,7 +236,9 @@ export function createPerformer(track) {
   const torso = el('g', { 'data-part': 'torso' });
   // Narrow shoulders open gradually into a rounded lower body; no waist pinch.
   torso.innerHTML = `<path d="M-12-92 C-19-91-22-86-23-78 C-25-62-30-43-33-26 C-36-5-25 11-9 12 L9 12 C25 11 36-5 33-26 C30-43 25-62 23-78 C22-86 19-91 12-92Z" fill="#edcba5" stroke="#a4835d" stroke-width="1.3" stroke-linejoin="round"/>`;
-  facing.append(torso, frontArm.group);
+  const frontFacing = el('g'); frontFacing.append(frontArm.group);
+  // Keep the rounded torso's volume while limbs exchange sides around it.
+  svg.append(torso, frontFacing);
   const head = el('g', { 'data-part': 'head' });
   const photo = el('image', { href: headURL, x: -61, y: -130, width: 122, height: 149, preserveAspectRatio: 'xMidYMax meet' });
   if (oldFallback) {
@@ -236,7 +247,8 @@ export function createPerformer(track) {
     head.append(oldFallback);
     photo.addEventListener('error', () => { photo.style.display = 'none'; oldFallback.removeAttribute('display'); });
   }
-  head.append(photo); facing.append(head);
+  // The photograph stays full-width while the illustrated body turns in depth.
+  head.append(photo); svg.append(head);
   const censor = el('g', { 'data-part': 'mosaic' });
   if (mosaic) { mosaic.setAttribute('transform', 'translate(-100 -174)'); censor.append(mosaic); }
   // Outside facing: the original nine-cell pattern never changes orientation.
@@ -255,6 +267,7 @@ export function createPerformer(track) {
     const size = track.getBoundingClientRect();
     scale = Math.min(innerHeight * .00094, size.width / 325);
     scale = Math.max(.25, scale);
+    if (bubble) bubble.style.setProperty('--performer-scale', String(scale));
     range = Math.max(0, size.width / scale - 300);
     runner.style.bottom = `${-22 * scale}px`;
     motion.advance(0, range);
@@ -271,23 +284,27 @@ export function createPerformer(track) {
     const s = motion.snapshot, pose = samplePose(s);
     lastPose = pose;
     runner.style.transform = `translate3d(${(s.x * scale).toFixed(2)}px,0,0) scale(${scale})`;
-    facing.setAttribute('transform', `translate(150 0) scale(${s.direction} 1) translate(-150 0)`);
-    torso.setAttribute('transform', `translate(${pose.hip.x} ${pose.hip.y}) rotate(${pose.lean}) scale(1 ${pose.squash})`);
-    const neck = rotatePoint(0, -80 * pose.squash, pose.lean);
-    const hx = pose.hip.x + neck.x, hy = pose.hip.y + neck.y;
-    tf(head, hx, hy, pose.headAngle);
+    facing.setAttribute('transform', `translate(150 0) scale(${s.facing} 1) translate(-150 0)`);
+    frontFacing.setAttribute('transform', `translate(150 0) scale(${s.facing} 1) translate(-150 0)`);
+    const hipX = 150 + (pose.hip.x - 150) * s.facing;
+    const bodyLean = pose.lean * s.facing;
+    torso.setAttribute('transform', `translate(${hipX} ${pose.hip.y}) rotate(${bodyLean}) scale(${.82 + .18 * s.facing * s.facing} ${pose.squash})`);
+    const neck = rotatePoint(0, -80 * pose.squash, bodyLean);
+    const hx = hipX + neck.x, hy = pose.hip.y + neck.y;
+    const headAngle = pose.headAngle * s.facing;
+    tf(head, hx, hy, headAngle);
     const shoulderL = rotatePoint(-20, -76, pose.lean), shoulderR = rotatePoint(20, -74, pose.lean);
     drawLimb(backArm, { x: pose.hip.x + shoulderL.x, y: pose.hip.y + shoulderL.y }, pose.handL, [33, 31], 1);
     drawLimb(backLeg, { x: pose.hip.x - 16, y: pose.hip.y }, pose.left, [44, 43], -1);
     drawLimb(frontLeg, { x: pose.hip.x + 16, y: pose.hip.y }, pose.right, [44, 43], -1);
     drawLimb(frontArm, { x: pose.hip.x + shoulderR.x, y: pose.hip.y + shoulderR.y }, pose.handR, [33, 31], -1);
-    tf(censor, 150 + (pose.hip.x - 150) * s.direction, pose.hip.y + 1);
+    tf(censor, 150 + (pose.hip.x - 150) * s.facing, pose.hip.y + 1);
     shadow.setAttribute('rx', (54 - pose.lift * .3 + pose.impact * 9).toFixed(2));
     shadow.setAttribute('opacity', (.26 - pose.lift * .002).toFixed(3));
     marks.setAttribute('opacity', pose.impact.toFixed(3));
     if (bubble) {
-      const headTop = rotatePoint(0, -126, pose.headAngle);
-      const bx = 150 + (hx + headTop.x - 150) * s.direction;
+      const headTop = rotatePoint(0, -126, headAngle);
+      const bx = hx + headTop.x;
       const by = hy + headTop.y - 12;
       bubble.style.transform = `translate(${bx.toFixed(2)}px,${by.toFixed(2)}px) translate(-50%,-100%)`;
     }

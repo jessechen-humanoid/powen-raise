@@ -4,6 +4,7 @@
   --ink: #fff9ec;
   --yellow: #edce82;
   --stage-rule: rgba(237, 206, 130, .19);
+  --stage-name-font-size: min(2.45vh, 1.58vw);
 }
 
 #screenArea {
@@ -50,10 +51,15 @@
   min-height: 5.85vh;
   padding: .95vh .4vw;
   border-bottom: 1px solid rgba(255, 249, 236, .055);
-  font-size: min(2.45vh, 1.58vw);
+  font-size: var(--stage-name-font-size);
   font-weight: 600;
   line-height: 1.5;
   text-shadow: none;
+}
+
+.performer .bubble {
+  /* Match the names after the actor's parent transform scales this text. */
+  font-size: calc(var(--stage-name-font-size) / var(--performer-scale, 1));
 }
 
 #board li .rank {
